@@ -10,8 +10,8 @@ workflow) or with `scripts/review.mjs`. What it does and the setup steps are in 
 Built and tested 2026-10-11 (all of `npm test` and `test/run-e2e.sh` pass), first pushed
 2026-10-12. Deployed 2026-10-13 (Supabase, GitHub token, Vercel, `.env.local` all set up);
 the first question from a test account was answered with `review.mjs` the same day.
-Automatic answers (`.github/workflows/answer-questions.yml` + the second migration) built and
-tested locally 2026-10-13; README setup step 6 (tokens, Actions secrets, Vault) is the user's.
+Automatic answers (`.github/workflows/answer-questions.yml` + the second migration) live since
+2026-10-13: a reply on the site started the workflow and Claude answered in about 1.5 minutes.
 
 ## Decisions (agreed with the user)
 
