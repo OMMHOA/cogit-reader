@@ -12,8 +12,9 @@ questions about the translation that Claude answers. The UI is in Hungarian.
   refuses the save if the paragraph changed meanwhile, and won't let a footnote marker (¹ ²) or
   a line's Markdown prefix (`#`, `-`, `1.`) change. Every edit is logged for review.
 - **Questions:** select words (optional), write a question; threads are stored in Supabase
-  (private, unlike the public books repo). A reply from Claude marks the thread answered; a
-  reply from a person reopens it.
+  (private, unlike the public books repo). Claude answers within a few minutes (a GitHub
+  workflow, setup step 6). A reply from Claude marks the thread answered; a reply from a person
+  reopens it, and Claude answers that too.
 - **Access:** email + password, invite-only: only accounts with `app_metadata.member` (set by
   `scripts/admin.mjs`) get in, enforced in the app and by row-level security.
 
@@ -40,6 +41,22 @@ questions about the translation that Claude answers. The UI is in Hungarian.
 5. **This machine:** copy `.env.example` to `.env.local` and fill in the Supabase URL,
    publishable and secret keys (the GitHub lines are only needed for `npm run dev`, which
    then commits to the real repo — don't).
+6. **Automatic answers:** every comment from a person starts the *Answer questions* workflow
+   (`.github/workflows/answer-questions.yml`): Claude Code reads the books repo (read-only
+   tools) and answers every open thread, on your Claude subscription, so there's no API bill.
+   - Here: `claude setup-token` (needs Pro or Max) prints a token valid for a year.
+   - GitHub → `cogit-reader` → Settings → Secrets and variables → Actions → New repository
+     secret, three times: `CLAUDE_CODE_OAUTH_TOKEN` (that token), `SUPABASE_URL` and
+     `SUPABASE_SECRET_KEY` (from step 2).
+   - A second fine-grained GitHub token, for starting the workflow: *Only select
+     repositories* → `cogit-reader`; Permissions → Repository → **Actions: Read and write**.
+   - Supabase SQL Editor → paste `supabase/migrations/20261013000000_answer_trigger.sql` → Run,
+     then run `select vault.create_secret('<the token>', 'github_dispatch_token');`
+   - Try it: GitHub → Actions → *Answer questions* → Run workflow, or ask a question on the site.
+
+   When a run fails (e.g. an expired token), GitHub emails you, and the questions wait for the
+   next run or for `review.mjs`. To renew the Supabase-side token:
+   `select vault.update_secret((select id from vault.secrets where name = 'github_dispatch_token'), '<new token>');`
 
 ## Accounts
 
@@ -56,7 +73,8 @@ Everyone can change their password on the site (click your name).
 
 ```sh
 node ../cogit-reader/scripts/review.mjs status
-node ../cogit-reader/scripts/review.mjs questions        # open threads with the paragraph
+node ../cogit-reader/scripts/review.mjs questions        # open threads with the paragraph (normally
+                                                         # none: the workflow answers them)
 node ../cogit-reader/scripts/review.mjs answer <id> "…"  # "-" reads the answer from stdin
 node ../cogit-reader/scripts/review.mjs edits            # unreviewed edits as word diffs
 node ../cogit-reader/scripts/review.mjs keep <id>…

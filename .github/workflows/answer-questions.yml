@@ -1,0 +1,74 @@
+# Answers the proofreaders' open questions with Claude Code, on the Claude subscription behind
+# the CLAUDE_CODE_OAUTH_TOKEN secret. The database starts it whenever a person writes a comment
+# (supabase/migrations/20261013000000_answer_trigger.sql); it can also be run by hand from the
+# Actions tab.
+name: Answer questions
+on: workflow_dispatch
+
+# One run at a time. Comments that come in meanwhile queue one more run, which answers them all.
+concurrency:
+  group: answer-questions
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  answer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash # with pipefail, unlike the default: a failed query must fail the run
+    steps:
+      # The books repo is the working directory, as for a review on your machine; this repo
+      # goes next to it.
+      - uses: actions/checkout@v5
+        with:
+          repository: OMMHOA/islamic-books-hun
+          ref: master
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          path: cogit-reader
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cogit-reader/package-lock.json
+      - run: npm ci --omit=dev
+        working-directory: cogit-reader
+
+      - name: Fetch the open questions
+        id: questions
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          echo "since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          node cogit-reader/scripts/review.mjs questions | tee "$RUNNER_TEMP/questions.txt"
+          if grep -q '^=== ' "$RUNNER_TEMP/questions.txt"; then echo "open=1" >> "$GITHUB_OUTPUT"; fi
+
+      # Claude only gets the read-only tools and no secrets apart from its own token.
+      - name: Ask Claude
+        if: steps.questions.outputs.open
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude -p "$(cat cogit-reader/scripts/answer-prompt.md)" \
+            --model opus --tools Read,Grep,Glob --permission-mode dontAsk \
+            --output-format json --json-schema '{
+              "type": "object", "additionalProperties": false, "required": ["answers"],
+              "properties": {"answers": {"type": "array", "items": {
+                "type": "object", "additionalProperties": false, "required": ["thread", "answer"],
+                "properties": {"thread": {"type": "string"}, "answer": {"type": "string"}}}}}}' \
+            < "$RUNNER_TEMP/questions.txt" > "$RUNNER_TEMP/claude.json"
+
+      - name: Post the answers
+        if: steps.questions.outputs.open
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: node cogit-reader/scripts/post-answers.mjs "$RUNNER_TEMP/claude.json" "${{ steps.questions.outputs.since }}"
