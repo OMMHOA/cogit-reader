@@ -8,9 +8,8 @@ its `master`) and ask questions that Claude answers from the books repo with
 ## Status
 
 Built and tested 2026-10-11 (all of `npm test` and `test/run-e2e.sh` pass), first pushed
-2026-10-12. **Not deployed yet**: the README's setup steps 2–5 (Supabase project in Frankfurt,
-fine-grained GitHub token, Vercel project + env vars, `.env.local`) are the user's to do in the
-web consoles; then add the first accounts with `scripts/admin.mjs`.
+2026-10-12. Deployed 2026-10-13 (Supabase, GitHub token, Vercel, `.env.local` all set up);
+the first question from a test account was answered with `review.mjs` the same day.
 
 ## Decisions (agreed with the user)
 
