@@ -30,5 +30,5 @@ begin
   return null;
 end $$;
 
-create trigger comments_answer after insert on public.comments
+create or replace trigger comments_answer after insert on public.comments
   for each row when (not new.is_claude) execute function public.dispatch_answer();
