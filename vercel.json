@@ -1,0 +1,4 @@
+{
+  "regions": ["fra1"],
+  "crons": [{ "path": "/api/ping", "schedule": "0 5 * * *" }]
+}

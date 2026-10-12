@@ -1,0 +1,157 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { currentUser, type Member } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { getBook } from "@/lib/books";
+import { headSha, treeOf, blobText, commitFile } from "@/lib/github";
+import { applyEdit, checkEdit, normalizeEdit } from "@/lib/blocks";
+
+export type Result = { error?: string };
+
+const AGAIN = "Jelentkezz be újra.";
+const str = (v: unknown, max = 50000) => (typeof v === "string" && v.length <= max ? v : null);
+const int = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : null);
+
+async function member(): Promise<Member | null> {
+  return (await currentUser()).member;
+}
+
+function commitAuthor(m: Member) {
+  const slug = m.name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return { name: m.name, email: `${slug || m.id.slice(0, 8)}@lektor.invalid` };
+}
+
+// One paragraph, straight to the branch as one commit by the proofreader.
+export async function saveEdit(input: { slug: unknown; blockIndex: unknown; oldText: unknown; newText: unknown }): Promise<Result> {
+  const m = await member();
+  if (!m) return { error: AGAIN };
+  const slug = str(input.slug, 200);
+  const index = int(input.blockIndex);
+  const oldText = str(input.oldText);
+  const raw = str(input.newText);
+  if (slug === null || index === null || oldText === null || raw === null) return { error: "Hibás kérés." };
+  const newText = normalizeEdit(raw);
+  const problem = checkEdit(oldText, newText);
+  if (problem) return { error: problem };
+
+  const book = await getBook(slug);
+  if (!book) return { error: "Nincs ilyen könyv." };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const head = await headSha();
+    const entry = (await treeOf(head)).find((e) => e.path === book.path);
+    if (!entry) return { error: "Nincs ilyen könyv." };
+    const edited = applyEdit(await blobText(entry.sha), index, oldText, newText);
+    if (!edited)
+      return { error: "Ez a bekezdés közben megváltozott. Töltsd újra az oldalt, és nézd meg az új szöveget." };
+    const snippet = newText.replace(/\s+/g, " ").slice(0, 100);
+    const sha = await commitFile({
+      parentSha: head,
+      path: book.path,
+      content: edited.text,
+      message: `Proofreading edit by ${m.name} (${slug})\n\n${snippet}${newText.length > 100 ? "…" : ""}\n\nSaved on the proofreading site.`,
+      author: commitAuthor(m),
+    });
+    if (!sha) continue; // the branch moved; read it again
+    const sb = await supabase();
+    const { error } = await sb.from("edits").insert({
+      path: book.path,
+      block_index: edited.index,
+      old_text: oldText,
+      new_text: newText,
+      commit_sha: sha,
+      author_id: m.id,
+    });
+    if (error) console.error("edit log:", error.message);
+    return {};
+  }
+  return { error: "Most nem sikerült menteni, próbáld újra egy perc múlva." };
+}
+
+export async function addComment(input: {
+  slug: unknown;
+  blockIndex: unknown;
+  blockText: unknown;
+  quote: unknown;
+  body: unknown;
+}): Promise<Result> {
+  const m = await member();
+  if (!m) return { error: AGAIN };
+  const slug = str(input.slug, 200);
+  const index = int(input.blockIndex);
+  const blockText = str(input.blockText);
+  const quote = input.quote == null ? null : str(input.quote, 2000);
+  const body = str(input.body, 5000)?.trim();
+  if (!slug || index === null || blockText === null || (input.quote != null && quote === null))
+    return { error: "Hibás kérés." };
+  if (!body) return { error: "Írd be a kérdést vagy a megjegyzést." };
+  const book = await getBook(slug);
+  if (!book) return { error: "Nincs ilyen könyv." };
+  const sb = await supabase();
+  const { error } = await sb.from("comments").insert({
+    path: book.path,
+    block_index: index,
+    block_text: blockText,
+    quote: quote?.trim() || null,
+    body,
+    author_id: m.id,
+  });
+  return error ? { error: "Nem sikerült elküldeni: " + error.message } : {};
+}
+
+export async function reply(input: { threadId: unknown; body: unknown }): Promise<Result> {
+  const m = await member();
+  if (!m) return { error: AGAIN };
+  const threadId = str(input.threadId, 100);
+  const body = str(input.body, 5000)?.trim();
+  if (!threadId) return { error: "Hibás kérés." };
+  if (!body) return { error: "Írd be a választ." };
+  const sb = await supabase();
+  const { data: root } = await sb.from("comments").select("path").eq("id", threadId).is("parent_id", null).single();
+  if (!root) return { error: "Nincs ilyen beszélgetés." };
+  const { error } = await sb.from("comments").insert({ path: root.path, parent_id: threadId, body, author_id: m.id });
+  return error ? { error: "Nem sikerült elküldeni: " + error.message } : {};
+}
+
+export async function setStatus(input: { threadId: unknown; status: unknown }): Promise<Result> {
+  const m = await member();
+  if (!m) return { error: AGAIN };
+  const threadId = str(input.threadId, 100);
+  const status = input.status === "resolved" || input.status === "open" ? input.status : null;
+  if (!threadId || !status) return { error: "Hibás kérés." };
+  const sb = await supabase();
+  const { error } = await sb.from("comments").update({ status }).eq("id", threadId).is("parent_id", null);
+  return error ? { error: error.message } : {};
+}
+
+export async function login(_: Result & { email?: string }, form: FormData): Promise<Result & { email?: string }> {
+  const email = String(form.get("email") ?? "").trim();
+  const password = String(form.get("password") ?? "");
+  const back = String(form.get("vissza") ?? "");
+  const sb = await supabase();
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) return { error: "Hibás e-mail-cím vagy jelszó.", email };
+  // Only a path on this site: "//x" and "/\\x" would leave it.
+  redirect(/^\/(?![/\\])/.test(back) ? back : "/");
+}
+
+export async function logout() {
+  const sb = await supabase();
+  await sb.auth.signOut();
+  redirect("/belepes");
+}
+
+export async function changePassword(_: Result & { done?: boolean }, form: FormData): Promise<Result & { done?: boolean }> {
+  if (!(await currentUser()).signedIn) return { error: AGAIN };
+  const password = String(form.get("password") ?? "");
+  if (password.length < 8) return { error: "A jelszó legalább 8 karakter legyen." };
+  if (password !== String(form.get("again") ?? "")) return { error: "A két jelszó nem egyezik." };
+  const sb = await supabase();
+  const { error } = await sb.auth.updateUser({ password });
+  return error ? { error: "Nem sikerült: " + error.message } : { done: true };
+}
