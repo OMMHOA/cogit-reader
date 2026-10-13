@@ -12,9 +12,8 @@ Built and tested 2026-10-11 (all of `npm test` and `test/run-e2e.sh` pass), firs
 the first question from a test account was answered with `review.mjs` the same day.
 Automatic answers (`.github/workflows/answer-questions.yml` + the second migration) live since
 2026-10-13: a reply on the site started the workflow and Claude answered in about 1.5 minutes.
-Edit marks and personal notes (per chapter and per paragraph) built 2026-10-14; the notes need
-the migrations `20261014000000_notes.sql` and `20261014010000_paragraph_notes.sql` pasted into
-the hosted project's SQL editor.
+Edit marks and personal notes (per chapter and per paragraph) live since 2026-10-14, with the
+third and fourth migrations applied on the hosted project.
 
 ## Decisions (agreed with the user)
 
