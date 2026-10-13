@@ -40,6 +40,12 @@ export default async function Home() {
             Ha előbb kijelölsz néhány szót, a kérdés azokhoz kapcsolódik. Claude válaszol; a válasz a bekezdés alatt és a{" "}
             <Link href="/kerdesek">Kérdések</Link> oldalon jelenik meg.
           </li>
+          <li>
+            Ha össze szeretnéd vetni a fordítást, az <b>angol</b> és az <b>arab</b> szöveget is megnézheted (ha a könyvnek
+            van ilyen változata): a fejezet tetején a <b>Párhuzamos szöveg</b> gombjaival minden bekezdés mellett, egy
+            bekezdésre kattintva pedig csak annál. A bekezdéseket gép párosítja, ezért néha egy bekezdéssel elcsúszhat;
+            ilyenkor az <b>‹ előtte</b> és <b>utána ›</b> gombokkal nézd meg a környezetét.
+          </li>
         </ol>
         <p>
           <b>Ezeket ne javítsd, inkább kérdezz rá:</b> a Korán-idézetek szövegét (szó szerint az MME-fordításból valók), a

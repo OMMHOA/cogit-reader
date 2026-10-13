@@ -40,11 +40,16 @@ Automatic answers (`.github/workflows/answer-questions.yml` + the second migrati
 - `npm run dev` with a real `GITHUB_TOKEN` commits to the real books repo. Test against the fake
   GitHub instead: `npx supabase start` once, then `test/run-e2e.sh [screenshot-dir]` (clones
   `../islamic-books-hun`, uses ports 3100 and 4010, refuses to start if they're taken).
-  `npx supabase stop` afterwards.
+  `npx supabase stop` afterwards. `test/run-e2e.sh --serve` is the same setup without the test,
+  left running on http://127.0.0.1:3100 for trying the site by hand (teszt@example.com /
+  jelszo-teszt-1; Ctrl-C stops it).
 - A stray server from an aborted run: `pkill -f "next start -p 310[0]"` (the bracket keeps
   pkill from matching its own shell).
 - The database schema is the migrations in `supabase/migrations/`; on the hosted project each is
   applied by pasting it into the SQL editor, on a running local one by
   `npx supabase migration up`.
+- The English/Arabic matching (`lib/align.ts`) is tuned on the real books: `test/align.test.mjs`
+  checks it against footnote numbers (English), marker counts and Qur'ān verse numbers
+  (Arabic), and sections only the translation has. Measure any change on both books.
 - To try the answering prompt without the workflow, run the `claude -p` line of the workflow
   from the books repo with `review.mjs questions` output on stdin; it only prints JSON.

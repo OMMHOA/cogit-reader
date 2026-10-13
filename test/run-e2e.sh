@@ -2,11 +2,15 @@
 # The whole end-to-end run on this machine: local Supabase (npx supabase start) must be up.
 # Makes a fresh bare copy of the books repo, empties the tables, (re)creates the test users,
 # builds and starts the site against the fake GitHub, runs test/e2e.mjs, stops everything.
+# With --serve it runs no test and leaves the site up for trying it by hand (Ctrl-C stops it):
+# edits go to the throwaway copy, never to the real books repo.
 #   test/run-e2e.sh [screenshot-dir]
+#   test/run-e2e.sh --serve
 set -euo pipefail
 cd "$(dirname "$0")/.."
 WORK=$(mktemp -d)
-SHOTS=${1:-}
+SERVE=$([ "${1:-}" = --serve ] && echo 1 || true)
+SHOTS=$([ -z "$SERVE" ] && echo "${1:-}" || true)
 trap 'kill $(jobs -p) 2>/dev/null || true; rm -rf "$WORK"' EXIT
 
 for port in 3100 4010; do
@@ -35,4 +39,8 @@ node_modules/.bin/next build >/dev/null
 node_modules/.bin/next start -p 3100 >"$WORK/next.log" 2>&1 &
 for _ in $(seq 1 40); do curl -sf -o /dev/null http://127.0.0.1:3100/belepes && break; sleep 0.5; done
 
+if [ -n "$SERVE" ]; then
+  echo "http://127.0.0.1:3100 — teszt@example.com / jelszo-teszt-1 (Ctrl-C stops it)"
+  wait
+fi
 BARE_REPO="$WORK/books.git" SHOTS="$SHOTS" node test/e2e.mjs || { tail -30 "$WORK/next.log"; exit 1; }

@@ -11,6 +11,12 @@ questions about the translation that Claude answers. The UI is in Hungarian.
   proofreader (`Name <name@lektor.invalid>`). The server only touches the Hungarian files,
   refuses the save if the paragraph changed meanwhile, and won't let a footnote marker (¹ ²) or
   a line's Markdown prefix (`#`, `-`, `1.`) change. Every edit is logged for review.
+- **English and Arabic:** the `*-ENG(-full).md` and `*-AR(-full).md` files next to a book's
+  Hungarian one can be shown beside every paragraph or under one (Fiqh has both; Muslim Home
+  only the Arabic, its English being a PDF). Nothing in the files says which paragraph renders
+  which, so `lib/align.ts` works it out: headings level by level, then paragraphs by length,
+  footnote markers, numbers and Qur'ān quotes; footnotes follow their markers. It's right
+  nearly everywhere but not guaranteed, so the box under a paragraph steps to its neighbours.
 - **Questions:** select words (optional), write a question; threads are stored in Supabase
   (private, unlike the public books repo). Claude answers within a few minutes (a GitHub
   workflow, setup step 6). A reply from Claude marks the thread answered; a reply from a person
@@ -84,8 +90,11 @@ node ../cogit-reader/scripts/review.mjs revert <id> "…"  # after reverting it 
 ## Tests
 
 ```sh
-npm test                 # the text logic, incl. a lossless round trip of both books
+npm test                 # the text logic, incl. a lossless round trip of both books and how
+                         # well their English and Arabic paragraphs are matched
 npx supabase start       # local Supabase in Docker (once)
 test/run-e2e.sh [dir]    # browser test: fresh copy of the books repo behind a fake GitHub API,
                          # local Supabase, production build; screenshots into dir
+test/run-e2e.sh --serve  # the same, without the test: the site stays up on http://127.0.0.1:3100
+                         # (teszt@example.com / jelszo-teszt-1) until Ctrl-C
 ```

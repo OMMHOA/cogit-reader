@@ -24,3 +24,6 @@ export function renderBlocks(blocks: Block[]): BlockView[] {
     return { index: b.index, text: b.text, html, editable: !/^\s*([-*_])(\s*\1){2,}\s*$/.test(b.text) };
   });
 }
+
+// Plain Markdown, for the English and Arabic texts shown next to the paragraphs.
+export const renderText = (text: string) => md.render(text);

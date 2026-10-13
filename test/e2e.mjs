@@ -200,6 +200,49 @@ try {
   await page.goto(`${BASE}/k/fiqh-us-seerah/4`);
   await shot(page, "08-fiqh-chapter");
 
+  // The English and Arabic text of one paragraph: the English has the same footnote markers.
+  const enBlk = page.locator(`#${await page.locator(".blk", { has: page.locator("a.fnref") }).nth(1).getAttribute("id")}`);
+  const marks = await enBlk.locator(".md a.fnref").allTextContents();
+  await enBlk.locator(".md").click({ position: { x: 5, y: 5 } });
+  await enBlk.getByRole("button", { name: "Angol szöveg" }).click();
+  await enBlk.locator(".par .par-text[lang=en] p").first().waitFor();
+  const en = await enBlk.locator(".par .par-text").innerText();
+  assert.ok(marks.length && marks.every((m) => en.includes(m)), `${marks} in ${en.slice(0, 200)}`);
+  await shot(page, "09-english");
+  await enBlk.getByRole("button", { name: "Arab szöveg" }).click();
+  await enBlk.locator(".par .par-text[dir=rtl][lang=ar] p").first().waitFor();
+  assert.match(await enBlk.locator(".par .par-text").innerText(), /[؀-ۿ]{3}/);
+  assert.match(await enBlk.locator(".par .par-head").innerText(), /\d+(–\d+)?\. oldal/);
+  const before = await enBlk.locator(".par .par-text > div").count();
+  await enBlk.getByRole("button", { name: "‹ előtte" }).click();
+  assert.equal(await enBlk.locator(".par .par-text > div").count(), before + 1);
+  assert.equal(await enBlk.locator(".par .par-text > div.ctx").count(), 1);
+  await shot(page, "10-arabic");
+  await enBlk.getByRole("button", { name: "Bezárás" }).first().click();
+  ok("a paragraph's English (same footnote markers) and Arabic (with its page and neighbours)");
+
+  // The Arabic beside every paragraph, remembered when the page is opened again.
+  await page.locator(".par-switch").getByRole("button", { name: "Arab" }).click();
+  await page.locator(".blk.two .par-col").first().waitFor();
+  assert.match(await page.locator(".blk.two .par-col").first().innerText(), /رسالة وإمام/);
+  const blocksN = await page.locator(".blk").count();
+  const filled = await page.locator(".par-col .par-text > div").count();
+  assert.ok(filled > blocksN * 0.8, `${filled} Arabic paragraphs for ${blocksN}`);
+  await shot(page, "11-parallel");
+  await page.reload();
+  await page.locator(".blk.two .par-col").first().waitFor();
+  await page.locator(".pager a", { hasText: "→" }).click();
+  await waitPath(page, "/k/fiqh-us-seerah/5");
+  await page.locator(".blk.two .par-col", { hasText: "من الميلاد إلى البعث" }).first().waitFor();
+  await page.locator(".par-switch").getByRole("button", { name: "Arab" }).click();
+  await page.locator(".blk.two").first().waitFor({ state: "detached" });
+  await page.goto(`${BASE}/k/muslim-home/2`);
+  await page.locator(".blk:has(.md > p)").first().click();
+  assert.equal(await page.getByRole("button", { name: "Angol szöveg" }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Arab szöveg" }).count(), 1);
+  assert.deepEqual(await page.locator(".par-switch button").allTextContents(), ["Arab"]);
+  ok("the Arabic beside every paragraph, kept on reload and in the next chapter; only the versions a book has are offered");
+
   // Phone width and dark mode.
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -211,10 +254,16 @@ try {
   await pp.goto(`${BASE}/k/muslim-home/2`);
   const overflow = await pp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 0, `horizontal overflow ${overflow}px`);
-  await shot(pp, "09-phone-dark");
+  await shot(pp, "12-phone-dark");
+  await pp.evaluate(() => localStorage.setItem("parhuzamos", "ar"));
+  await pp.reload();
+  await pp.locator(".blk.two .par-col").first().waitFor();
+  const overflowPar = await pp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  assert.ok(overflowPar <= 0, `horizontal overflow with the Arabic ${overflowPar}px`);
+  await shot(pp, "13-phone-arabic");
   await pp.goto(`${BASE}/`);
-  await shot(pp, "10-phone-home");
-  ok("no horizontal scrolling at phone width");
+  await shot(pp, "14-phone-home");
+  ok("no horizontal scrolling at phone width, also with the Arabic under the paragraphs");
 
   // Not a member: no access.
   const other = await browser.newPage();

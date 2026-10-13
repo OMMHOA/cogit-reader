@@ -31,6 +31,9 @@ export default async function SectionPage({ params }: { params: Promise<{ book: 
       </nav>
       <ChapterView
         slug={slug}
+        sec={s.index}
+        version={book.sha}
+        langs={(["en", "ar"] as const).filter((l) => book.versions[l])}
         blocks={renderBlocks(book.blocks.slice(s.first, s.last + 1))}
         threads={here}
         orphans={orphans}

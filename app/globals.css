@@ -315,6 +315,10 @@ button.link {
   color: var(--muted);
   text-decoration: underline;
 }
+button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
 button:disabled {
   opacity: 0.6;
   cursor: default;
@@ -469,6 +473,116 @@ blockquote.was {
   border-left: 3px solid var(--line);
   color: var(--muted);
   white-space: pre-wrap;
+}
+
+/* The English or Arabic text: beside every paragraph, or under one */
+.par-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 0 16px;
+  font-family: var(--ui);
+  font-size: 0.9rem;
+}
+.par-switch button {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+.par-switch button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.page.reading:has(.chapter.two) {
+  max-width: 90rem;
+}
+.blk.two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 28px;
+}
+.par-col {
+  border-left: 1px solid var(--line);
+  padding-left: 16px;
+  cursor: auto;
+}
+.par {
+  margin: 2px 0 12px;
+  padding: 6px 14px 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  cursor: auto;
+}
+.par-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+}
+.par-nav {
+  display: flex;
+  gap: 12px;
+}
+.par-head .close {
+  margin-left: auto;
+  font-size: 1.3rem;
+  line-height: 1;
+  text-decoration: none;
+}
+.par-head button.link:disabled {
+  text-decoration: none;
+}
+.par-text {
+  font-size: 0.97em;
+  overflow-wrap: anywhere;
+}
+.par-text[lang="ar"] {
+  font-family: var(--font-arabic), serif;
+  font-size: 1.2em;
+  line-height: 1.9;
+}
+.par-text p,
+.par-text ul,
+.par-text ol {
+  margin: 0.4em 0 0.8em;
+}
+.par-text h1,
+.par-text h2,
+.par-text h3 {
+  font-size: 1.1em;
+  margin: 0.5em 0 0.3em;
+}
+.par-text .ctx {
+  opacity: 0.5;
+}
+.par-text .note-unit {
+  font-size: 0.92em;
+}
+.page-no {
+  font-family: var(--ui);
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.4em;
+}
+
+@media (max-width: 1000px) {
+  .blk.two {
+    display: block;
+  }
+  .par-col {
+    border-left: 0;
+    border-top: 1px dashed var(--line);
+    padding: 2px 0 0;
+    margin-bottom: 10px;
+  }
+  .par-col.none {
+    display: none;
+  }
 }
 
 /* Lists of questions and edits */
