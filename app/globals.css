@@ -19,6 +19,11 @@
   --del: #f9dcd8;
   --ins: #d9efd9;
   --error: #b42318;
+  --mine: #2f6db5;
+  --others: #b8487f;
+  --note: #fbf4d4;
+  --note-line: #e3d18a;
+  --note-text: #77621a;
   --book: var(--font-book), Georgia, "Times New Roman", var(--font-arabic), serif;
   --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: light;
@@ -46,6 +51,11 @@
     --del: #4a2622;
     --ins: #1f3a24;
     --error: #ff8a80;
+    --mine: #80b3ee;
+    --others: #ee95c1;
+    --note: #2e2a1b;
+    --note-line: #6b5d2c;
+    --note-text: #e3cf7e;
     color-scheme: dark;
   }
 }
@@ -274,6 +284,98 @@ h2 {
   font-weight: 600;
 }
 
+/* Paragraphs edited on the site: a change bar over the paragraph's left edge, solid for your own
+   edits, dashed for another proofreader's, two-tone when both edited it. */
+.by-me {
+  --rail: var(--mine);
+}
+.by-others {
+  --rail: repeating-linear-gradient(var(--others) 0 6px, transparent 6px 9px);
+}
+.by-me.by-others {
+  --rail: repeating-linear-gradient(var(--mine) 0 6px, var(--others) 6px 12px);
+}
+.blk.edited .md {
+  position: relative;
+}
+.blk.edited .md::before,
+.key::before,
+.change::before {
+  content: "";
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--rail);
+}
+.blk.edited .md::before {
+  left: -15px; /* the .blk's padding and border */
+  top: 0;
+  bottom: 0;
+}
+.blk.active .md::before,
+.blk:target .md::before {
+  display: none;
+}
+.chapter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  margin: 0 0 16px;
+  font-family: var(--ui);
+  font-size: 0.9rem;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.par-switch + .legend {
+  margin-left: auto;
+}
+.key {
+  position: relative;
+  padding-left: 9px;
+}
+.key::before {
+  left: 0;
+  top: 2px;
+  height: 15px;
+}
+.changes {
+  font-family: var(--ui);
+  font-size: 0.93rem;
+  line-height: 1.5;
+  margin: 2px 0 12px;
+  padding: 6px 14px 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  cursor: auto;
+}
+.change {
+  position: relative;
+  padding: 6px 0 0 12px;
+}
+.change + .change {
+  border-top: 1px solid var(--line);
+}
+.change::before {
+  left: 0;
+  top: 9px;
+  bottom: 12px;
+}
+.change .chip {
+  margin-left: 6px;
+}
+.changes .diff {
+  font-size: 1rem;
+  margin: 4px 0 10px;
+}
+
 /* Tools under a paragraph */
 .tools {
   font-family: var(--ui);
@@ -481,9 +583,6 @@ blockquote.was {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
-  margin: 0 0 16px;
-  font-family: var(--ui);
-  font-size: 0.9rem;
 }
 .par-switch button {
   padding: 3px 12px;
@@ -635,6 +734,106 @@ ins {
   border-radius: 4px;
 }
 
+/* The proofreader's own note on a chapter */
+.page.reading {
+  padding-bottom: 48px; /* the pager stays clear of the note button */
+}
+.note-card,
+.note-panel {
+  font-family: var(--ui);
+  font-size: 0.93rem;
+  line-height: 1.5;
+  background: var(--note);
+  border: 1px solid var(--note-line);
+}
+.note-card {
+  margin: 0 0 20px;
+  padding: 8px 14px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.note-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 0.85rem;
+}
+.note-head b {
+  color: var(--note-text);
+}
+.note-head .link {
+  margin-left: auto;
+}
+.note-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-top: 4px;
+  max-height: 12em;
+  overflow: auto;
+}
+.note-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  width: min(26rem, calc(100vw - 32px));
+  padding: 10px 14px 12px;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+}
+.note-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note-panel .close {
+  font-size: 1.3rem;
+  line-height: 1;
+  text-decoration: none;
+}
+.note-panel textarea {
+  margin-top: 8px;
+  resize: vertical;
+}
+.note-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 4px;
+  font-size: 0.8rem;
+}
+.note-foot .error {
+  margin: 0;
+}
+.saved-mark {
+  color: var(--answered);
+}
+.note-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border-color: var(--note-line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+.note-fab.has {
+  background: var(--note);
+  color: var(--note-text);
+  font-weight: 600;
+}
+.count.note {
+  color: var(--note-text);
+  background: var(--note);
+}
+
 /* Forms */
 .stack {
   display: flex;
@@ -666,5 +865,15 @@ ins {
   }
   .me {
     margin-left: 0;
+  }
+  .par-switch + .legend {
+    margin-left: 0;
+  }
+  .note-panel {
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    border-width: 1px 0 0;
+    border-radius: 10px 10px 0 0;
   }
 }

@@ -95,6 +95,16 @@ export function sectionOf(sections: Section[], blockIndex: number): number {
   return sections.length ? sections[sections.length - 1].index : 0;
 }
 
+// Where a chapter kept by index and title (a personal note's) is now: the same place if its
+// title is unchanged there, else the nearest chapter with that title, else the same place.
+export function locateSection(sections: Section[], index: number, title: string): number {
+  if (sections[index]?.title === title) return index;
+  const same = sections.filter((s) => s.title === title);
+  if (same.length)
+    return same.reduce((best, s) => (Math.abs(s.index - index) < Math.abs(best.index - index) ? s : best)).index;
+  return Math.max(0, Math.min(index, sections.length - 1));
+}
+
 // --- Edits -------------------------------------------------------------------------------
 
 const MARKERS = /[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g;

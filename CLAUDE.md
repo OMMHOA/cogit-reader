@@ -12,6 +12,8 @@ Built and tested 2026-10-11 (all of `npm test` and `test/run-e2e.sh` pass), firs
 the first question from a test account was answered with `review.mjs` the same day.
 Automatic answers (`.github/workflows/answer-questions.yml` + the second migration) live since
 2026-10-13: a reply on the site started the workflow and Claude answered in about 1.5 minutes.
+Edit marks and personal notes built 2026-10-14; the notes need the third migration
+(`supabase/migrations/20261014000000_notes.sql`) pasted into the hosted project's SQL editor.
 
 ## Decisions (agreed with the user)
 
@@ -27,6 +29,9 @@ Automatic answers (`.github/workflows/answer-questions.yml` + the second migrati
   services** (Claude API key, Vercel Sandbox): the user doesn't want billing. Claude gets only
   Read/Grep/Glob and no Supabase key; a separate step posts its answers. Edits are still
   reviewed by hand with `review.mjs`.
+- Personal notes (`notes` table) are private to their author: RLS allows only them, and nothing
+  else may read the table — not `review.mjs`, not the workflow, not Claude in a review. Keep it
+  that way; the UI promises it ("sem a többi lektor, sem Claude nem olvassa").
 - The UI is Hungarian, informal (*te*). Error messages in `lib/blocks.ts` too.
 - An edit may only change words: same number of lines, same Markdown prefix per line, same
   footnote markers (¹ ²…), no blank lines (`checkEdit` in `lib/blocks.ts`). Everything outside

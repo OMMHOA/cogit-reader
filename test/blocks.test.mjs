@@ -8,6 +8,7 @@ import {
   normalizeEdit,
   applyEdit,
   locateAnchor,
+  locateSection,
   wordDiff,
 } from "../lib/blocks.ts";
 
@@ -69,6 +70,15 @@ test("anchors survive edits and moves", () => {
   );
   assert.equal(locateAnchor(blocks, { blockIndex: 1, blockText: "egészen más", quote: "Első bekezdés" }), 0);
   assert.equal(locateAnchor(blocks, { blockIndex: 1, blockText: "egészen más", quote: null }), -1);
+});
+
+test("a chapter is found again by its title after chapters move", () => {
+  const s = parseSections(parseBlocks("# A\n\nx\n\n# B\n\ny\n\n# C\n\nz\n"));
+  assert.equal(locateSection(s, 1, "B"), 1);
+  const moved = parseSections(parseBlocks("# Új\n\nw\n\n# A\n\nx\n\n# B\n\ny\n\n# C\n\nz\n"));
+  assert.equal(locateSection(moved, 1, "B"), 2);
+  assert.equal(locateSection(moved, 2, "Átnevezve"), 2); // title gone: the same place
+  assert.equal(locateSection(s, 9, "Nincs"), 2);
 });
 
 test("wordDiff", () => {

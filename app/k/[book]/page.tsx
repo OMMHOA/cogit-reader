@@ -3,14 +3,15 @@ import { notFound } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { getBook } from "@/lib/books";
 import { loadThreads } from "@/lib/threads";
+import { loadNotes } from "@/lib/notes";
 import { sectionOf } from "@/lib/blocks";
 
 export default async function BookPage({ params }: { params: Promise<{ book: string }> }) {
-  await requireMember();
+  const me = await requireMember();
   const { book: slug } = await params;
   const book = await getBook(slug);
   if (!book) notFound();
-  const threads = await loadThreads([book], book.path);
+  const [threads, notes] = await Promise.all([loadThreads([book], book.path), loadNotes(book, me.id)]);
   const open = new Map<number, number>();
   for (const t of threads) {
     if (t.status === "resolved") continue;
@@ -25,6 +26,7 @@ export default async function BookPage({ params }: { params: Promise<{ book: str
           <li key={s.index}>
             <Link href={`/k/${slug}/${s.index}`}>{s.index === 0 && s.title === book.title ? "Címlap" : s.title}</Link>
             {open.get(s.index) ? <span className="count">{open.get(s.index)} beszélgetés</span> : null}
+            {notes.has(s.index) && <span className="count note">jegyzet</span>}
           </li>
         ))}
       </ol>

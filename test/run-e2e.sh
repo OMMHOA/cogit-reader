@@ -28,8 +28,9 @@ GITHUB_BRANCH=master
 EOF
 export ENV_FILE="$WORK/env"
 docker exec supabase_db_cogit-reader psql -qU postgres -c \
-  "truncate public.comments, public.edits; delete from auth.users where email like '%@example.com';"
+  "truncate public.comments, public.edits, public.notes; delete from auth.users where email like '%@example.com';"
 node scripts/admin.mjs add teszt@example.com "Teszt Elek" jelszo-teszt-1 >/dev/null
+node scripts/admin.mjs add kollega@example.com "Kolléga Kata" jelszo-teszt-3 >/dev/null
 node scripts/admin.mjs add kivulallo@example.com "Kívülálló" jelszo-teszt-2 >/dev/null
 node scripts/admin.mjs remove kivulallo@example.com >/dev/null
 

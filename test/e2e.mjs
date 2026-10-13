@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // End-to-end test against a running site (`next start`) that uses the local Supabase and
 // test/fake-github.mjs. Needs the test users from scripts/admin.mjs:
-//   teszt@example.com / jelszo-teszt-1 (member), kivulallo@example.com / jelszo-teszt-2 (no access)
+//   teszt@example.com / jelszo-teszt-1 (member), kollega@example.com / jelszo-teszt-3 (member),
+//   kivulallo@example.com / jelszo-teszt-2 (no access)
 // Env: BASE_URL, BARE_REPO (the fake GitHub's repo), ENV_FILE (for the scripts), SHOTS (optional
 // directory for screenshots).
 import { chromium } from "playwright";
@@ -42,6 +43,15 @@ const waitPath = (page, path) => page.waitForFunction((p) => location.pathname +
 // The n-th text paragraph on the page, pinned by its id (the editor replaces its text).
 const para = async (page, n) => page.locator(`#${await page.locator(".blk:has(.md > p)").nth(n).getAttribute("id")}`);
 const shot = async (page, name) => SHOTS && page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: false });
+// Supabase as a user, straight against the API (row-level security applies).
+const e = env();
+async function apiAs(email, password) {
+  const c = createClient(e.NEXT_PUBLIC_SUPABASE_URL, e.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false } });
+  if (!email) return { c, user: null };
+  const { data, error } = await c.auth.signInWithPassword({ email, password });
+  assert.ifError(error);
+  return { c, user: data.user };
+}
 
 const browser = await chromium.launch();
 try {
@@ -91,6 +101,18 @@ try {
   assert.equal(stat, `1\t1\t${MH}`);
   assert.ok(git("show", `master:${MH}`).includes(edited));
   ok("a valid edit becomes one commit by the proofreader that changes one line");
+
+  // The edited paragraph is marked as ours, and what changed is a click away.
+  await page.locator(`#${blkId}.edited.by-me:not(.by-others)`).waitFor();
+  assert.deepEqual(await page.locator(".legend .key").allTextContents(), ["te javítottad"]);
+  await blk.click();
+  await blk.getByRole("button", { name: "Ki mit javított?" }).click();
+  await blk.locator(".changes .change.by-me ins", { hasText: "(teszt)" }).waitFor();
+  assert.match(await blk.locator(".changes .meta").textContent(), /^Te · .*Ellenőrzésre vár$/);
+  await shot(page, "04b-changes");
+  await blk.locator(".changes .close").click();
+  await blk.locator(".changes").waitFor({ state: "detached" });
+  ok("an edited paragraph gets a change bar as yours, and shows its word diff");
 
   // Ask about selected words.
   const blk2 = await para(page, 4);
@@ -148,10 +170,81 @@ try {
   await page.goto(`${BASE}/k/muslim-home/2`);
   await page.locator(`#${blkId} .msg.claude`, { hasText: "visszaállítottam" }).waitFor();
   assert.ok(!(await page.locator(`#${blkId} .md`).textContent()).includes("(teszt)"));
+  assert.equal(await page.locator(`#${blkId}.edited`).count(), 0);
   await page.goto(`${BASE}/javitasok`);
   assert.equal(await page.locator(".edit-item .chip").first().textContent(), "Visszaállítva");
   await page.locator(".edit-item .note", { hasText: "arab szöveget" }).waitFor();
-  ok("a reverted edit shows Claude's reason under the paragraph and in the edits list");
+  ok("a reverted edit shows Claude's reason under the paragraph and in the edits list, and loses its mark");
+
+  // A colleague's edit (logged through the API as the site does after its commit), then one of
+  // ours on the same paragraph.
+  const kata = await apiAs("kollega@example.com", "jelszo-teszt-3");
+  await page.goto(`${BASE}/k/muslim-home/2`);
+  const kBlk = await para(page, 3);
+  const kId = await kBlk.getAttribute("id");
+  await kBlk.click();
+  await kBlk.getByRole("button", { name: "Javítás" }).click();
+  const kText = await kBlk.locator("textarea.edit").inputValue();
+  await kBlk.getByRole("button", { name: "Mégse" }).click();
+  const { error: kErr } = await kata.c.from("edits").insert({
+    path: MH,
+    block_index: Number(kId.slice(2)),
+    old_text: kText.replace(/\S+$/, "régi."),
+    new_text: kText,
+    commit_sha: "0".repeat(40),
+    author_id: kata.user.id,
+  });
+  assert.ifError(kErr);
+  await page.reload();
+  await page.locator(`#${kId}.edited.by-others:not(.by-me)`).waitFor();
+  assert.deepEqual(await page.locator(".legend .key").allTextContents(), ["más javította"]);
+  await kBlk.click();
+  await kBlk.getByRole("button", { name: "Javítás" }).click();
+  await kBlk.locator("textarea.edit").fill(kText + " (mi is)");
+  await kBlk.getByRole("button", { name: "Mentés" }).click();
+  await page.locator(`#${kId}.edited.by-me.by-others`).waitFor();
+  await kBlk.click();
+  await kBlk.getByRole("button", { name: "Ki mit javított?" }).click();
+  assert.deepEqual(await kBlk.locator(".changes .meta b").allTextContents(), ["Kolléga Kata", "Te"]);
+  await kBlk.locator(".changes .change.by-others ins", { hasText: kText.split(/\s+/).at(-1) }).waitFor();
+  await shot(page, "07b-marks");
+  await kBlk.getByText("Bezárás", { exact: true }).click();
+  ok("a colleague's edit gets their mark, both of ours a two-tone one, with who changed what");
+
+  // A personal note on the chapter: written from the corner button, saves itself.
+  const me = await apiAs("teszt@example.com", "jelszo-teszt-1");
+  const NOTE = "Itt tartok, holnap folytatom.\nA 3. bekezdést még egyszer.";
+  await page.locator(".note-fab").click();
+  await page.locator(".note-panel textarea").fill(NOTE);
+  await page.locator(".note-panel .saved-mark").waitFor();
+  await shot(page, "07c-note");
+  await page.keyboard.press("Escape");
+  await page.locator(".note-fab.has").waitFor();
+  await page.reload();
+  assert.equal(await page.locator(".note-card .note-body").innerText(), NOTE);
+  // Each chapter has its own; one written just before leaving the chapter is saved too.
+  await page.goto(`${BASE}/k/muslim-home/3`);
+  assert.equal(await page.locator(".note-card").count(), 0);
+  await page.locator(".note-fab").click();
+  await page.locator(".note-panel textarea").fill("Másik fejezet.");
+  await page.locator(".crumbs a").click();
+  await waitPath(page, "/k/muslim-home");
+  for (let i = 0; i < 40; i++) {
+    const { data } = await me.c.from("notes").select("body");
+    if (data.length === 2) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  await page.reload();
+  const tocNotes = await page.locator(".toc li").evaluateAll((lis) => lis.map((li) => !!li.querySelector(".count.note")));
+  assert.deepEqual(tocNotes.flatMap((has, i) => (has ? [i] : [])), [2, 3]);
+  await page.goto(`${BASE}/k/muslim-home/3`);
+  await page.locator(".note-card", { hasText: "Másik fejezet." }).click();
+  await page.locator(".note-panel textarea").fill("");
+  await page.locator(".note-panel .saved-mark").waitFor();
+  assert.equal(await page.locator(".note-card").count(), 0);
+  const { data: myNotes } = await me.c.from("notes").select("id, body, section_index");
+  assert.deepEqual(myNotes.map((n) => [n.body, n.section_index]), [[NOTE, 2]]);
+  ok("a personal note per chapter saves itself (also when leaving at once), shows in the contents, goes when emptied");
 
   // A stale page: another paragraph changed meanwhile → saving still works and keeps that change;
   // the same paragraph changed meanwhile → refused.
@@ -263,6 +356,12 @@ try {
   await shot(pp, "13-phone-arabic");
   await pp.goto(`${BASE}/`);
   await shot(pp, "14-phone-home");
+  await pp.goto(`${BASE}/k/muslim-home/2`);
+  await pp.locator(".note-fab").click();
+  await pp.locator(".note-panel textarea").waitFor();
+  const overflowNote = await pp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  assert.ok(overflowNote <= 0, `horizontal overflow with the note open ${overflowNote}px`);
+  await shot(pp, "15-phone-note");
   ok("no horizontal scrolling at phone width, also with the Arabic under the paragraphs");
 
   // Not a member: no access.
@@ -275,8 +374,7 @@ try {
   ok("a signed-in non-member is shut out");
 
   // Row-level security, straight against the API.
-  const e = env();
-  const anon = createClient(e.NEXT_PUBLIC_SUPABASE_URL, e.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false } });
+  const { c: anon } = await apiAs();
   const { data: anonRows } = await anon.from("comments").select("id");
   assert.equal(anonRows?.length ?? 0, 0);
   const outsider = createClient(e.NEXT_PUBLIC_SUPABASE_URL, e.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false } });
@@ -296,7 +394,20 @@ try {
   assert.ok(rewrite, "comment bodies must not be editable");
   const { error: sign } = await anon.auth.signUp({ email: "uj@example.com", password: "jelszo-uj-123" });
   assert.ok(sign, "sign-ups must be off");
-  ok("RLS: outsiders see nothing, members can't post as Claude or rewrite comments, sign-ups are off");
+  // Notes: only their author's.
+  for (const c of [anon, outsider, kata.c]) {
+    const { data } = await c.from("notes").select("id");
+    assert.equal(data?.length ?? 0, 0, "someone else's notes must not be readable");
+  }
+  const { data: stolen } = await kata.c.from("notes").update({ body: "átírva" }).eq("id", myNotes[0].id).select("id");
+  assert.equal(stolen.length, 0);
+  const { error: forged } = await kata.c
+    .from("notes")
+    .insert({ path: MH, section_index: 0, section_title: "x", body: "x", author_id: login.user.id });
+  assert.ok(forged, "nobody writes a note as someone else");
+  const { data: mineNow } = await me.c.from("notes").select("body");
+  assert.deepEqual(mineNow.map((n) => n.body), [NOTE]);
+  ok("RLS: outsiders see nothing, members can't post as Claude or rewrite comments, notes are private, sign-ups are off");
 
   console.log(`\nall ${step} passed`);
 } finally {

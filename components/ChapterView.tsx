@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { saveEdit, addComment } from "@/app/actions";
 import type { BlockView } from "@/lib/render";
 import type { Thread } from "@/lib/threads";
+import type { EditMark } from "@/lib/edits";
 import type { Lang } from "@/lib/books";
 import ThreadView from "./ThreadView";
 import { Column, LANG_TITLE, Peek, Status, columns, useOriginals } from "./Original";
+import { Diff, EditChip } from "./EditDiff";
 
 type Mode = { index: number; kind: "menu" | "edit" | "comment"; quote: string | null } | null;
 
@@ -21,6 +23,7 @@ export default function ChapterView({
   blocks,
   threads,
   orphans,
+  edits,
 }: {
   slug: string;
   sec: number;
@@ -29,6 +32,7 @@ export default function ChapterView({
   blocks: BlockView[];
   threads: Thread[];
   orphans: Thread[];
+  edits: EditMark[]; // made on the site, on this section's paragraphs
 }) {
   const [mode, setMode] = useState<Mode>(null);
   const [draft, setDraft] = useState("");
@@ -39,6 +43,8 @@ export default function ChapterView({
   // The English or Arabic text: beside every paragraph (side), or under one (peek).
   const [side, setSide] = useState<Lang | null>(null);
   const [peek, setPeek] = useState<{ index: number; lang: Lang } | null>(null);
+  // The paragraph whose edits are shown as word diffs.
+  const [changes, setChanges] = useState<number | null>(null);
   const originals = useOriginals(slug, sec, version, [side, peek?.lang ?? null]);
 
   useEffect(() => {
@@ -59,7 +65,7 @@ export default function ChapterView({
   };
 
   const pick = (e: React.MouseEvent<HTMLDivElement>, b: BlockView) => {
-    if ((e.target as HTMLElement).closest("a, button, textarea, .thread, .thread-collapsed, .tools, .par, .par-col")) return;
+    if ((e.target as HTMLElement).closest("a, button, textarea, .thread, .thread-collapsed, .tools, .par, .par-col, .changes")) return;
     if (mode && mode.index === b.index && mode.kind !== "menu") return;
     const sel = window.getSelection();
     const text = sel && !sel.isCollapsed ? sel.toString().replace(/\s+/g, " ").trim() : "";
@@ -93,6 +99,13 @@ export default function ChapterView({
 
   const byBlock = new Map<number, Thread[]>();
   for (const t of threads) byBlock.set(t.blockIndex, [...(byBlock.get(t.blockIndex) ?? []), t]);
+  const editsOf = new Map<number, EditMark[]>();
+  for (const e of edits) editsOf.set(e.blockIndex, [...(editsOf.get(e.blockIndex) ?? []), e]);
+  // Who edited a paragraph, as classes for its change bar: by-me, by-others or both.
+  const editedBy = (list: EditMark[] | undefined) =>
+    list
+      ? ` edited${list.some((e) => e.mine) ? " by-me" : ""}${list.some((e) => !e.mine) ? " by-others" : ""}`
+      : "";
 
   const sideData = side ? originals.get(side) : undefined;
   const cols =
@@ -105,15 +118,26 @@ export default function ChapterView({
 
   return (
     <div className={`chapter${side ? " two" : ""}`}>
-      {langs.length > 0 && (
-        <div className="par-switch">
-          <span className="muted">Párhuzamos szöveg:</span>
-          {langs.map((l) => (
-            <button key={l} className={side === l ? "on" : undefined} aria-pressed={side === l} onClick={() => toggleSide(l)}>
-              {LANG_TITLE[l]}
-            </button>
-          ))}
-          {side && !cols && <Status state={sideData} onRetry={() => originals.retry(side)} />}
+      {(langs.length > 0 || edits.length > 0) && (
+        <div className="chapter-bar">
+          {langs.length > 0 && (
+            <div className="par-switch">
+              <span className="muted">Párhuzamos szöveg:</span>
+              {langs.map((l) => (
+                <button key={l} className={side === l ? "on" : undefined} aria-pressed={side === l} onClick={() => toggleSide(l)}>
+                  {LANG_TITLE[l]}
+                </button>
+              ))}
+              {side && !cols && <Status state={sideData} onRetry={() => originals.retry(side)} />}
+            </div>
+          )}
+          {edits.length > 0 && (
+            <p className="legend muted">
+              Javított bekezdés:
+              {edits.some((e) => e.mine) && <span className="key by-me">te javítottad</span>}
+              {edits.some((e) => !e.mine) && <span className="key by-others">más javította</span>}
+            </p>
+          )}
         </div>
       )}
       {orphans.length > 0 && (
@@ -131,11 +155,12 @@ export default function ChapterView({
       {blocks.map((b) => {
         const active = mode?.index === b.index;
         const editing = active && mode.kind === "edit";
+        const blockEdits = editsOf.get(b.index);
         return (
           <div
             key={b.index}
             id={`p-${b.index}`}
-            className={`blk${active ? " active" : ""}${b.editable ? "" : " fixed"}${cols ? " two" : ""}`}
+            className={`blk${active ? " active" : ""}${b.editable ? "" : " fixed"}${cols ? " two" : ""}${editedBy(blockEdits)}`}
             onClick={b.editable ? (e) => pick(e, b) : undefined}
           >
             <div className="hu">
@@ -176,6 +201,24 @@ export default function ChapterView({
                   onClose={() => setPeek(null)}
                 />
               )}
+              {changes === b.index && blockEdits && (
+                <div className="changes">
+                  <div className="par-head">
+                    <b>Javítások ezen a bekezdésen</b>
+                    <button className="link close" onClick={() => setChanges(null)} aria-label="Bezárás">
+                      ×
+                    </button>
+                  </div>
+                  {blockEdits.map((e) => (
+                    <div key={e.id} className={`change${e.mine ? " by-me" : " by-others"}`}>
+                      <div className="meta">
+                        <b>{e.mine ? "Te" : e.author}</b> · {e.at} <EditChip status={e.status} />
+                      </div>
+                      <Diff before={e.oldText} after={e.newText} />
+                    </div>
+                  ))}
+                </div>
+              )}
               {saved?.index === b.index && <p className="saved">{saved.text}</p>}
               {active && mode.kind === "menu" && (
                 <div className="tools buttons">
@@ -183,6 +226,14 @@ export default function ChapterView({
                   <button onClick={() => open(b, "comment")}>
                     {mode.quote ? "Kérdés a kijelölt szövegről" : "Kérdés vagy megjegyzés"}
                   </button>
+                  {blockEdits && (
+                    <button
+                      aria-pressed={changes === b.index}
+                      onClick={() => setChanges(changes === b.index ? null : b.index)}
+                    >
+                      Ki mit javított?
+                    </button>
+                  )}
                   {langs
                     .filter((l) => l !== side)
                     .map((l) => (

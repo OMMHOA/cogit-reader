@@ -10,7 +10,10 @@ questions about the translation that Claude answers. The UI is in Hungarian.
 - **Edits:** a paragraph edit is one commit on `master` of the books repo, authored by the
   proofreader (`Name <name@lektor.invalid>`). The server only touches the Hungarian files,
   refuses the save if the paragraph changed meanwhile, and won't let a footnote marker (¹ ²) or
-  a line's Markdown prefix (`#`, `-`, `1.`) change. Every edit is logged for review.
+  a line's Markdown prefix (`#`, `-`, `1.`) change. Every edit is logged for review, and the
+  paragraph gets a change bar: solid blue for your own edits, dashed rose for another
+  proofreader's, both colors when both edited it; *Ki mit javított?* shows who changed what as
+  word diffs. Reverted edits lose their mark.
 - **English and Arabic:** the `*-ENG(-full).md` and `*-AR(-full).md` files next to a book's
   Hungarian one can be shown beside every paragraph or under one (Fiqh has both; Muslim Home
   only the Arabic, its English being a PDF). Nothing in the files says which paragraph renders
@@ -21,6 +24,10 @@ questions about the translation that Claude answers. The UI is in Hungarian.
   (private, unlike the public books repo). Claude answers within a few minutes (a GitHub
   workflow, setup step 6). A reply from Claude marks the thread answered; a reply from a person
   reopens it, and Claude answers that too.
+- **Personal notes:** one per proofreader and chapter, written from the *Jegyzet* button in the
+  corner and shown at the top of the chapter (and as *jegyzet* in the contents). It saves itself.
+  Only its author can read it (row-level security), and no script reads the table, so Claude
+  never sees it and it starts no workflow.
 - **Access:** email + password, invite-only: only accounts with `app_metadata.member` (set by
   `scripts/admin.mjs`) get in, enforced in the app and by row-level security.
 
@@ -30,7 +37,8 @@ questions about the translation that Claude answers. The UI is in Hungarian.
    in it).
 2. **Supabase** ([supabase.com](https://supabase.com), free plan): new project, region
    *Central EU (Frankfurt)*. Then:
-   - SQL Editor → paste `supabase/migrations/20261011000000_init.sql` → Run.
+   - SQL Editor → paste `supabase/migrations/20261011000000_init.sql` → Run, then the same with
+     `supabase/migrations/20261014000000_notes.sql` (personal notes).
    - Authentication → Sign In / Providers → turn off **Allow new users to sign up**.
    - Project Settings → API Keys: note the project URL, the **publishable** key and the
      **secret** key.

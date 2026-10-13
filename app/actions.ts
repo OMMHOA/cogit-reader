@@ -129,6 +129,60 @@ export async function setStatus(input: { threadId: unknown; status: unknown }): 
   return error ? { error: error.message } : {};
 }
 
+// The member's own note on a chapter (lib/notes.ts): `ids` are the rows shown as the note; an
+// empty text deletes it. Returns the row the text is now in (null when deleted).
+export async function saveNote(input: {
+  slug: unknown;
+  sec: unknown;
+  title: unknown;
+  ids: unknown;
+  body: unknown;
+}): Promise<Result & { id?: string | null }> {
+  const m = await member();
+  if (!m) return { error: AGAIN };
+  const slug = str(input.slug, 200);
+  const sec = int(input.sec);
+  const title = str(input.title, 1000);
+  const ids = input.ids;
+  const body = str(input.body, 20000)?.trim();
+  if (
+    !slug ||
+    sec === null ||
+    title === null ||
+    body === undefined ||
+    !Array.isArray(ids) ||
+    ids.length > 20 ||
+    !ids.every((id) => str(id, 100))
+  )
+    return { error: "Hibás kérés." };
+  const book = await getBook(slug);
+  if (!book) return { error: "Nincs ilyen könyv." };
+  const sb = await supabase();
+  let id: string | null = null;
+  if (body) {
+    const row = { section_index: sec, section_title: title, body, updated_at: new Date().toISOString() };
+    // Its row may have been deleted meanwhile (another tab): then it's a new note.
+    const updated = ids.length ? await sb.from("notes").update(row).eq("id", ids[0]).select("id").maybeSingle() : null;
+    if (updated?.error) return { error: "Nem sikerült menteni: " + updated.error.message };
+    id = updated?.data?.id ?? null;
+    if (!id) {
+      const { data, error } = await sb
+        .from("notes")
+        .insert({ ...row, path: book.path, author_id: m.id })
+        .select("id")
+        .single();
+      if (error) return { error: "Nem sikerült menteni: " + error.message };
+      id = data.id;
+    }
+  }
+  const gone = ids.filter((x) => x !== id);
+  if (gone.length) {
+    const { error } = await sb.from("notes").delete().in("id", gone);
+    if (error) return { error: "Nem sikerült menteni: " + error.message };
+  }
+  return { id };
+}
+
 export async function login(_: Result & { email?: string }, form: FormData): Promise<Result & { email?: string }> {
   const email = String(form.get("email") ?? "").trim();
   const password = String(form.get("password") ?? "");

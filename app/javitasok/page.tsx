@@ -3,7 +3,9 @@ import { requireMember } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { listBooks } from "@/lib/books";
 import { formatDate } from "@/lib/threads";
-import { locateAnchor, sectionOf, wordDiff } from "@/lib/blocks";
+import { locateAnchor, sectionOf } from "@/lib/blocks";
+import type { EditStatus } from "@/lib/edits";
+import { Diff, EditChip } from "@/components/EditDiff";
 
 type Edit = {
   id: string;
@@ -13,11 +15,9 @@ type Edit = {
   old_text: string;
   new_text: string;
   author_name: string;
-  status: "pending" | "kept" | "reverted";
+  status: EditStatus;
   note: string | null;
 };
-
-const LABEL = { pending: "Ellenőrzésre vár", kept: "Rendben", reverted: "Visszaállítva" };
 
 export default async function Edits() {
   await requireMember();
@@ -44,7 +44,7 @@ export default async function Edits() {
         return (
           <article key={e.id} className="edit-item">
             <div className="meta">
-              <span className={`chip ${e.status}`}>{LABEL[e.status]}</span> <b>{e.author_name}</b> · {formatDate(e.created_at)}
+              <EditChip status={e.status} /> <b>{e.author_name}</b> · {formatDate(e.created_at)}
               {book && s && (
                 <>
                   {" · "}
@@ -54,17 +54,7 @@ export default async function Edits() {
                 </>
               )}
             </div>
-            <p className="diff">
-              {wordDiff(e.old_text, e.new_text).map((p, i) =>
-                p.kind === "same" ? (
-                  <span key={i}>{p.text}</span>
-                ) : p.kind === "del" ? (
-                  <del key={i}>{p.text}</del>
-                ) : (
-                  <ins key={i}>{p.text}</ins>
-                ),
-              )}
-            </p>
+            <Diff before={e.old_text} after={e.new_text} />
             {e.note && (
               <p className="note">
                 <b>Claude:</b> {e.note}
