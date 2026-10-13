@@ -18,6 +18,12 @@ export default async function BookPage({ params }: { params: Promise<{ book: str
     const s = sectionOf(book.sections, t.blockIndex === -1 ? t.hintIndex : t.blockIndex);
     open.set(s, (open.get(s) ?? 0) + 1);
   }
+  // The reader's own notes, on the chapter and on its paragraphs.
+  const noted = new Map<number, number>();
+  const note = (s: number) => noted.set(s, (noted.get(s) ?? 0) + 1);
+  for (const s of notes.chapters.keys()) note(s);
+  for (const b of notes.paragraphs.keys()) note(sectionOf(book.sections, b));
+  for (const l of notes.lost) note(l.section);
   return (
     <div className="page">
       <h1>{book.title}</h1>
@@ -26,7 +32,7 @@ export default async function BookPage({ params }: { params: Promise<{ book: str
           <li key={s.index}>
             <Link href={`/k/${slug}/${s.index}`}>{s.index === 0 && s.title === book.title ? "Címlap" : s.title}</Link>
             {open.get(s.index) ? <span className="count">{open.get(s.index)} beszélgetés</span> : null}
-            {notes.has(s.index) && <span className="count note">jegyzet</span>}
+            {noted.get(s.index) ? <span className="count note">{noted.get(s.index)} jegyzet</span> : null}
           </li>
         ))}
       </ol>

@@ -129,12 +129,16 @@ export async function setStatus(input: { threadId: unknown; status: unknown }): 
   return error ? { error: error.message } : {};
 }
 
-// The member's own note on a chapter (lib/notes.ts): `ids` are the rows shown as the note; an
-// empty text deletes it. Returns the row the text is now in (null when deleted).
+// The member's own note on a chapter, or on a paragraph of it when `blockIndex` and `blockText`
+// (the paragraph as it is now, which the note is anchored to from then on) are given
+// (lib/notes.ts). `ids` are the rows shown as the note; an empty text deletes it. Returns the
+// row the text is now in (null when deleted).
 export async function saveNote(input: {
   slug: unknown;
   sec: unknown;
   title: unknown;
+  blockIndex?: unknown;
+  blockText?: unknown;
   ids: unknown;
   body: unknown;
 }): Promise<Result & { id?: string | null }> {
@@ -143,12 +147,16 @@ export async function saveNote(input: {
   const slug = str(input.slug, 200);
   const sec = int(input.sec);
   const title = str(input.title, 1000);
+  const anchored = input.blockIndex != null;
+  const blockIndex = anchored ? int(input.blockIndex) : null;
+  const blockText = anchored ? str(input.blockText) : null;
   const ids = input.ids;
   const body = str(input.body, 20000)?.trim();
   if (
     !slug ||
     sec === null ||
     title === null ||
+    (anchored && (blockIndex === null || !blockText)) ||
     body === undefined ||
     !Array.isArray(ids) ||
     ids.length > 20 ||
@@ -160,7 +168,13 @@ export async function saveNote(input: {
   const sb = await supabase();
   let id: string | null = null;
   if (body) {
-    const row = { section_index: sec, section_title: title, body, updated_at: new Date().toISOString() };
+    const row = {
+      section_index: sec,
+      section_title: title,
+      ...(anchored ? { block_index: blockIndex, block_text: blockText } : {}),
+      body,
+      updated_at: new Date().toISOString(),
+    };
     // Its row may have been deleted meanwhile (another tab): then it's a new note.
     const updated = ids.length ? await sb.from("notes").update(row).eq("id", ids[0]).select("id").maybeSingle() : null;
     if (updated?.error) return { error: "Nem sikerült menteni: " + updated.error.message };

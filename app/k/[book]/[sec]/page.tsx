@@ -8,7 +8,7 @@ import { loadNotes } from "@/lib/notes";
 import { renderBlocks } from "@/lib/render";
 import { sectionOf } from "@/lib/blocks";
 import ChapterView from "@/components/ChapterView";
-import ChapterNote from "@/components/ChapterNote";
+import { ChapterNote } from "@/components/Notes";
 
 export default async function SectionPage({ params }: { params: Promise<{ book: string; sec: string }> }) {
   const me = await requireMember();
@@ -36,16 +36,21 @@ export default async function SectionPage({ params }: { params: Promise<{ book: 
       <nav className="crumbs">
         <Link href={`/k/${slug}`}>{book.title}</Link>
       </nav>
-      <ChapterNote key={`${slug}/${s.index}`} slug={slug} sec={s.index} title={s.title} note={notes.get(s.index) ?? null} />
+      <ChapterNote key={`${slug}/${s.index}`} slug={slug} sec={s.index} title={s.title} note={notes.chapters.get(s.index) ?? null} />
       <ChapterView
         slug={slug}
         sec={s.index}
+        title={s.title}
         version={book.sha}
         langs={(["en", "ar"] as const).filter((l) => book.versions[l])}
         blocks={renderBlocks(book.blocks.slice(s.first, s.last + 1))}
         threads={here}
         orphans={orphans}
         edits={edits.filter((e) => e.blockIndex >= s.first && e.blockIndex <= s.last)}
+        notes={[...notes.paragraphs]
+          .filter(([i]) => i >= s.first && i <= s.last)
+          .map(([blockIndex, note]) => ({ blockIndex, note }))}
+        lostNotes={notes.lost.filter((l) => l.section === s.index)}
       />
       {pager}
     </div>

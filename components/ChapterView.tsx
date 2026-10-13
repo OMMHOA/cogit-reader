@@ -6,10 +6,12 @@ import { saveEdit, addComment } from "@/app/actions";
 import type { BlockView } from "@/lib/render";
 import type { Thread } from "@/lib/threads";
 import type { EditMark } from "@/lib/edits";
+import type { Note } from "@/lib/notes";
 import type { Lang } from "@/lib/books";
 import ThreadView from "./ThreadView";
 import { Column, LANG_TITLE, Peek, Status, columns, useOriginals } from "./Original";
 import { Diff, EditChip } from "./EditDiff";
+import { ParagraphNote } from "./Notes";
 
 type Mode = { index: number; kind: "menu" | "edit" | "comment"; quote: string | null } | null;
 
@@ -18,21 +20,27 @@ const SIDE = "parhuzamos"; // the chosen parallel text, remembered in the browse
 export default function ChapterView({
   slug,
   sec,
+  title,
   version,
   langs,
   blocks,
   threads,
   orphans,
   edits,
+  notes,
+  lostNotes,
 }: {
   slug: string;
   sec: number;
+  title: string;
   version: string; // of the Hungarian file
   langs: Lang[]; // the book's other versions
   blocks: BlockView[];
   threads: Thread[];
   orphans: Thread[];
   edits: EditMark[]; // made on the site, on this section's paragraphs
+  notes: { blockIndex: number; note: Note }[]; // the reader's own, on this section's paragraphs
+  lostNotes: { hintIndex: number; blockText: string; note: Note }[]; // on paragraphs not found any more
 }) {
   const [mode, setMode] = useState<Mode>(null);
   const [draft, setDraft] = useState("");
@@ -45,6 +53,10 @@ export default function ChapterView({
   const [peek, setPeek] = useState<{ index: number; lang: Lang } | null>(null);
   // The paragraph whose edits are shown as word diffs.
   const [changes, setChanges] = useState<number | null>(null);
+  // The paragraph note being written ("p<block>", or "l<id>" for a lost paragraph's), and the
+  // paragraphs whose note was opened here: those stay mounted, so a new note stays on the page.
+  const [noteAt, setNoteAt] = useState<string | null>(null);
+  const [opened, setOpened] = useState<Set<number>>(new Set());
   const originals = useOriginals(slug, sec, version, [side, peek?.lang ?? null]);
 
   useEffect(() => {
@@ -65,7 +77,7 @@ export default function ChapterView({
   };
 
   const pick = (e: React.MouseEvent<HTMLDivElement>, b: BlockView) => {
-    if ((e.target as HTMLElement).closest("a, button, textarea, .thread, .thread-collapsed, .tools, .par, .par-col, .changes")) return;
+    if ((e.target as HTMLElement).closest("a, button, textarea, .thread, .thread-collapsed, .tools, .par, .par-col, .changes, .pnote")) return;
     if (mode && mode.index === b.index && mode.kind !== "menu") return;
     const sel = window.getSelection();
     const text = sel && !sel.isCollapsed ? sel.toString().replace(/\s+/g, " ").trim() : "";
@@ -99,6 +111,12 @@ export default function ChapterView({
 
   const byBlock = new Map<number, Thread[]>();
   for (const t of threads) byBlock.set(t.blockIndex, [...(byBlock.get(t.blockIndex) ?? []), t]);
+  const notesOf = new Map(notes.map((n) => [n.blockIndex, n.note]));
+  const writeNote = (b: BlockView) => {
+    setOpened((o) => new Set(o).add(b.index));
+    setNoteAt(`p${b.index}`);
+    setMode(null);
+  };
   const editsOf = new Map<number, EditMark[]>();
   for (const e of edits) editsOf.set(e.blockIndex, [...(editsOf.get(e.blockIndex) ?? []), e]);
   // Who edited a paragraph, as classes for its change bar: by-me, by-others or both.
@@ -152,6 +170,28 @@ export default function ChapterView({
           ))}
         </section>
       )}
+      {lostNotes.length > 0 && (
+        <section className="orphans">
+          <h2>Saját jegyzetek megváltozott bekezdésekhez</h2>
+          <p className="muted">Ezek a bekezdések azóta annyira megváltoztak, hogy nem találjuk őket, ezért a jegyzeted itt látszik.</p>
+          {lostNotes.map((l) => (
+            <div key={l.note.ids[0]}>
+              <blockquote className="was">{l.blockText}</blockquote>
+              <ParagraphNote
+                slug={slug}
+                sec={sec}
+                title={title}
+                blockIndex={l.hintIndex}
+                blockText={l.blockText}
+                note={l.note}
+                editing={noteAt === `l${l.note.ids[0]}`}
+                onEdit={() => setNoteAt(`l${l.note.ids[0]}`)}
+                onDone={() => setNoteAt(null)}
+              />
+            </div>
+          ))}
+        </section>
+      )}
       {blocks.map((b) => {
         const active = mode?.index === b.index;
         const editing = active && mode.kind === "edit";
@@ -190,6 +230,22 @@ export default function ChapterView({
               ) : (
                 <div className="md" dangerouslySetInnerHTML={{ __html: b.html }} />
               )}
+              {(notesOf.has(b.index) || opened.has(b.index)) && (
+                // Keyed by the text: when the paragraph changes, the note is the server's again,
+                // anchored to the new text.
+                <ParagraphNote
+                  key={b.text}
+                  slug={slug}
+                  sec={sec}
+                  title={title}
+                  blockIndex={b.index}
+                  blockText={b.text}
+                  note={notesOf.get(b.index) ?? null}
+                  editing={noteAt === `p${b.index}`}
+                  onEdit={() => setNoteAt(`p${b.index}`)}
+                  onDone={() => setNoteAt(null)}
+                />
+              )}
               {peek?.index === b.index && (
                 <Peek
                   key={`${peek.index}:${peek.lang}`}
@@ -226,6 +282,7 @@ export default function ChapterView({
                   <button onClick={() => open(b, "comment")}>
                     {mode.quote ? "Kérdés a kijelölt szövegről" : "Kérdés vagy megjegyzés"}
                   </button>
+                  <button onClick={() => writeNote(b)}>Saját jegyzet</button>
                   {blockEdits && (
                     <button
                       aria-pressed={changes === b.index}

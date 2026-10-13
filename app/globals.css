@@ -833,6 +833,30 @@ ins {
   color: var(--note-text);
   background: var(--note);
 }
+.pnote {
+  font-family: var(--ui);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 0 12px;
+  padding: 6px 12px 8px;
+  background: var(--note);
+  border: 1px solid var(--note-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pnote.editing {
+  cursor: auto;
+}
+.pnote .note-head svg {
+  width: 14px;
+  height: 14px;
+  align-self: center;
+  color: var(--note-text);
+}
+.pnote textarea {
+  margin-top: 6px;
+  resize: vertical;
+}
 
 /* Forms */
 .stack {

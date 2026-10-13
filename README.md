@@ -24,10 +24,12 @@ questions about the translation that Claude answers. The UI is in Hungarian.
   (private, unlike the public books repo). Claude answers within a few minutes (a GitHub
   workflow, setup step 6). A reply from Claude marks the thread answered; a reply from a person
   reopens it, and Claude answers that too.
-- **Personal notes:** one per proofreader and chapter, written from the *Jegyzet* button in the
-  corner and shown at the top of the chapter (and as *jegyzet* in the contents). It saves itself.
-  Only its author can read it (row-level security), and no script reads the table, so Claude
-  never sees it and it starts no workflow.
+- **Personal notes:** on a chapter (the *Jegyzet* button in the corner; shown at the top of the
+  chapter) and on any paragraph (*Saját jegyzet* in its menu; shown under it, and following it
+  through edits the way questions do; if the paragraph is rewritten beyond recognition the note
+  stays in the chapter with the old text). They save themselves, and the contents count them per
+  chapter. Only their author can read them (row-level security), and no script reads the table,
+  so Claude never sees them and they start no workflow.
 - **Access:** email + password, invite-only: only accounts with `app_metadata.member` (set by
   `scripts/admin.mjs`) get in, enforced in the app and by row-level security.
 
@@ -38,7 +40,8 @@ questions about the translation that Claude answers. The UI is in Hungarian.
 2. **Supabase** ([supabase.com](https://supabase.com), free plan): new project, region
    *Central EU (Frankfurt)*. Then:
    - SQL Editor → paste `supabase/migrations/20261011000000_init.sql` → Run, then the same with
-     `supabase/migrations/20261014000000_notes.sql` (personal notes).
+     `supabase/migrations/20261014000000_notes.sql` and
+     `supabase/migrations/20261014010000_paragraph_notes.sql` (personal notes).
    - Authentication → Sign In / Providers → turn off **Allow new users to sign up**.
    - Project Settings → API Keys: note the project URL, the **publishable** key and the
      **secret** key.

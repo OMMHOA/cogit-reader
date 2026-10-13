@@ -246,6 +246,51 @@ try {
   assert.deepEqual(myNotes.map((n) => [n.body, n.section_index]), [[NOTE, 2]]);
   ok("a personal note per chapter saves itself (also when leaving at once), shows in the contents, goes when emptied");
 
+  // A note on one paragraph: written under it from its menu; it follows the paragraph through
+  // an edit, and stays in the chapter (with the old text) when the paragraph is rewritten.
+  await page.goto(`${BASE}/k/muslim-home/2`);
+  const nBlk = await para(page, 5);
+  const nId = await nBlk.getAttribute("id");
+  const PNOTE = "Ezt a szót még nézd meg.";
+  await nBlk.click();
+  await nBlk.getByRole("button", { name: "Saját jegyzet" }).click();
+  await nBlk.locator(".pnote textarea").fill(PNOTE);
+  await nBlk.locator(".pnote .saved-mark").waitFor();
+  await shot(page, "07d-paragraph-note");
+  await nBlk.getByRole("button", { name: "Kész" }).click();
+  assert.equal(await nBlk.locator(".pnote .note-body").textContent(), PNOTE);
+  await page.reload();
+  await page.locator(`#${nId} .pnote .note-body`, { hasText: PNOTE }).waitFor();
+  assert.equal(await page.locator(".pnote").count(), 1);
+  await nBlk.locator(".md").click({ position: { x: 5, y: 5 } });
+  await nBlk.getByRole("button", { name: "Javítás" }).click();
+  const nOld = await nBlk.locator("textarea.edit").inputValue();
+  await nBlk.locator("textarea.edit").fill(nOld + " (jav.)");
+  await nBlk.getByRole("button", { name: "Mentés" }).click();
+  await page.locator(`#${nId} .md`, { hasText: "(jav.)" }).waitFor();
+  await page.locator(`#${nId} .pnote .note-body`, { hasText: PNOTE }).waitFor();
+  // Saving it again anchors it to the paragraph as it is now.
+  await nBlk.locator(".pnote").click();
+  await nBlk.locator(".pnote textarea").fill(PNOTE + " Kész.");
+  await nBlk.locator(".pnote .saved-mark").waitFor();
+  await page.keyboard.press("Escape");
+  const { data: pRows } = await me.c.from("notes").select("block_text, body").not("block_index", "is", null);
+  assert.deepEqual(pRows, [{ block_text: nOld + " (jav.)", body: PNOTE + " Kész." }]);
+  commitElsewhere(MH, (s) => s.replace(nOld + " (jav.)", "Egészen más bekezdés került ide, semmi köze az előzőhöz."), "Rewrite a paragraph");
+  await page.reload();
+  await page.locator(".orphans .pnote .note-body", { hasText: PNOTE }).waitFor();
+  assert.equal(await page.locator(`#${nId} .pnote`).count(), 0);
+  assert.ok((await page.locator(".orphans blockquote.was").last().textContent()).includes("(jav.)"));
+  await page.goto(`${BASE}/k/muslim-home`);
+  assert.equal(await page.locator(".toc li").nth(2).locator(".count.note").textContent(), "2 jegyzet");
+  await page.goto(`${BASE}/k/muslim-home/2`);
+  await page.locator(".orphans .pnote").click();
+  await page.locator(".orphans .pnote textarea").fill("");
+  await page.locator(".orphans .pnote .saved-mark").waitFor();
+  await page.getByRole("button", { name: "Kész" }).click();
+  assert.equal(await page.locator(".pnote").count(), 0);
+  ok("a note on a paragraph: under it, follows it through an edit, kept in the chapter when the paragraph is rewritten");
+
   // A stale page: another paragraph changed meanwhile → saving still works and keeps that change;
   // the same paragraph changed meanwhile → refused.
   await page.goto(`${BASE}/k/muslim-home/2`);
