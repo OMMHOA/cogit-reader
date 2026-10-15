@@ -215,7 +215,12 @@ export default function ChapterView({
                   />
                   <p className="hint">
                     A <code>*csillagok közötti*</code> szöveg dőlt, a <code>**dupla csillagok közötti**</code> félkövér. A sor
-                    eleji jelekhez (<code>#</code>, <code>-</code>, <code>1.</code>) és a lábjegyzetszámokhoz (¹ ²) ne nyúlj.
+                    eleji jelekhez (<code>#</code>, <code>-</code>, <code>1.</code>) és a lábjegyzetszámokhoz (¹ ²) ne nyúlj. Az
+                    egységes írásmódok (idézőjelek, szavak, nevek) a{" "}
+                    <a href="/szabalyok" target="_blank">
+                      Szabályok
+                    </a>{" "}
+                    oldalon vannak.
                   </p>
                   {error && <p className="error">{error}</p>}
                   <div className="buttons">

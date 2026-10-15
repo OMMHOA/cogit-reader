@@ -7,7 +7,7 @@
 // directory for screenshots).
 import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
@@ -22,14 +22,16 @@ const git = (...args) => execFileSync("git", ["--git-dir", BARE, ...args], { enc
 const review = (...args) =>
   execFileSync("node", [new URL("../scripts/review.mjs", import.meta.url).pathname, ...args], { encoding: "utf8" });
 
-// A commit made "elsewhere" (like a push from the books repo), via a throwaway clone.
+// A commit made "elsewhere" (like a push from the books repo), via a throwaway clone. A file
+// that isn't there yet starts empty.
 function commitElsewhere(path, change, message) {
   const dir = mkdtempSync(join(tmpdir(), "e2e-"));
   try {
     execFileSync("git", ["clone", "-q", BARE, dir]);
     const file = join(dir, path);
-    writeFileSync(file, change(readFileSync(file, "utf8")));
-    execFileSync("git", ["-C", dir, "-c", "user.name=Books", "-c", "user.email=b@x.invalid", "commit", "-qam", message]);
+    writeFileSync(file, change(existsSync(file) ? readFileSync(file, "utf8") : ""));
+    execFileSync("git", ["-C", dir, "add", path]);
+    execFileSync("git", ["-C", dir, "-c", "user.name=Books", "-c", "user.email=b@x.invalid", "commit", "-qm", message]);
     execFileSync("git", ["-C", dir, "push", "-q", "origin", "HEAD:master"]);
   } finally {
     rmSync(dir, { recursive: true });
@@ -380,6 +382,19 @@ try {
   assert.equal(await page.getByRole("button", { name: "Arab szöveg" }).count(), 1);
   assert.deepEqual(await page.locator(".par-switch button").allTextContents(), ["Arab"]);
   ok("the Arabic beside every paragraph, kept on reload and in the next chapter; only the versions a book has are offered");
+
+  // The rules: the books repo's FORDITASI-ELVEK.md, as on the latest master; the edit box links to them.
+  await page.locator(".blk.active").getByRole("button", { name: "Javítás" }).click();
+  assert.equal(await page.locator(".tools .hint a").getAttribute("href"), "/szabalyok");
+  await page.locator(".blk.active").getByRole("button", { name: "Mégse" }).click();
+  commitElsewhere("FORDITASI-ELVEK.md", () => "# A fordítás szabályai\n\n## Írásjelek\n\n- Idézőjel: „…”, idézeten belül »…«.\n", "Rules");
+  await page.locator(".top nav a", { hasText: "Szabályok" }).click();
+  await waitPath(page, "/szabalyok");
+  await page.locator(".rules h2").waitFor();
+  assert.equal(await page.locator(".rules h1").textContent(), "A fordítás szabályai");
+  assert.equal(await page.locator(".rules li").textContent(), "Idézőjel: „…”, idézeten belül »…«.");
+  await shot(page, "16-rules");
+  ok("the rules page shows the rules file of the latest master, and the edit box links to it");
 
   // Phone width and dark mode.
   const phone = await browser.newContext({

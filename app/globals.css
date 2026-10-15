@@ -177,6 +177,18 @@ h2 {
   margin-bottom: 8px;
 }
 
+.rules h2 {
+  margin: 1.6em 0 0.4em;
+}
+.rules li {
+  margin-bottom: 6px;
+}
+.rules [lang="ar"] {
+  font-family: var(--font-arabic), serif;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
 .toc {
   padding-left: 1.4em;
   font-family: var(--book);

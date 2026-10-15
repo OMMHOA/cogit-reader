@@ -50,7 +50,8 @@ export default async function Home() {
         <p>
           <b>Ezeket ne javítsd, inkább kérdezz rá:</b> a Korán-idézetek szövegét (szó szerint az MME-fordításból valók), a
           nevek írásmódját (egységes átírási szabályt követnek), a tiszteletformulákat, mint a (ﷺ), és a szerző
-          kemény megfogalmazásait (a fordítás nem tompít rajtuk).
+          kemény megfogalmazásait (a fordítás nem tompít rajtuk). Ezek és a többi egységes írásmód (idézőjelek, szavak,
+          nevek) a <Link href="/szabalyok">Szabályok</Link> oldalon vannak.
         </p>
       </section>
     </div>

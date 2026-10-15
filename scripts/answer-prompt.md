@@ -17,6 +17,9 @@ Answer the last message of every thread:
   and CLAUDE.md, the book's TODO.md and errata files record the conventions and the decisions
   already made. The books are large: find places with Grep (a name, a number, a reference) and
   read only the lines around them, never whole files.
+- FORDITASI-ELVEK.md is the proofreaders' summary of those conventions, the site's Szabályok
+  page. When an answer rests on one of its rules, name the part („a Szabályok oldalon, a Nevek
+  résznél”), so they can find it there next time.
 - Write in the language of the question (normally Hungarian, informally: te), as plain text
   without Markdown, in a few sentences: what the original says, and the answer. Quote the
   original briefly where it helps.

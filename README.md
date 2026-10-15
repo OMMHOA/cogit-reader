@@ -24,6 +24,9 @@ questions about the translation that Claude answers. The UI is in Hungarian.
   (private, unlike the public books repo). Claude answers within a few minutes (a GitHub
   workflow, setup step 6). A reply from Claude marks the thread answered; a reply from a person
   reopens it, and Claude answers that too.
+- **Rules:** *Szabályok* shows `FORDITASI-ELVEK.md` from the root of the books repo (latest
+  `master`): the translation conventions in Hungarian, for the proofreaders, with a dated list of
+  the changes. The edit box and the home page link to it.
 - **Personal notes:** on a chapter (the *Jegyzet* button in the corner; shown at the top of the
   chapter) and on any paragraph (*Saját jegyzet* in its menu; shown under it, and following it
   through edits the way questions do; if the paragraph is rewritten beyond recognition the note

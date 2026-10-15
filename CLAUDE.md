@@ -48,8 +48,8 @@ third and fourth migrations applied on the hosted project.
   `npx supabase stop` afterwards. `test/run-e2e.sh --serve` is the same setup without the test,
   left running on http://127.0.0.1:3100 for trying the site by hand (teszt@example.com /
   jelszo-teszt-1; Ctrl-C stops it).
-- A stray server from an aborted run: `pkill -f "next start -p 310[0]"` (the bracket keeps
-  pkill from matching its own shell).
+- A stray server from an aborted run: `fuser -k 3100/tcp 4010/tcp`. (Not `pkill -f "next start"`:
+  that kills only the parent, and its `next-server` child keeps port 3100.)
 - The database schema is the migrations in `supabase/migrations/`; on the hosted project each is
   applied by pasting it into the SQL editor, on a running local one by
   `npx supabase migration up`.

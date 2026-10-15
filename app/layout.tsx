@@ -28,6 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/">Könyvek</Link>
               <Link href="/kerdesek">Kérdések</Link>
               <Link href="/javitasok">Javítások</Link>
+              <Link href="/szabalyok">Szabályok</Link>
               <span className="me">
                 <Link href="/jelszo" title="Jelszó módosítása">
                   {member.name}
