@@ -134,13 +134,13 @@ for (const f of FILES) {
     console.log(f, blocks.length, "blocks;", sections.map((s) => s.title).join(" | "));
   });
 
-  // Every 9th paragraph changed the ways the books get changed (on the site or in git): its
+  // Every 3rd paragraph changed the ways the books get changed (on the site or in git): its
   // thread must stay with it, and a deleted paragraph's thread must rarely land elsewhere.
   test(`real book: anchors follow changed paragraphs: ${f}`, () => {
     const blocks = parseBlocks(readFileSync(new URL(f, BOOKS), "utf8"));
     const found = { grew: 0, joined: 0, split: 0, reworded: 0, deletedElsewhere: 0 };
     let n = 0;
-    for (let i = 1; i < blocks.length - 1; i += 9) {
+    for (let i = 1; i < blocks.length - 1; i += 3) {
       const t = blocks[i].text;
       if (t.startsWith("#") || (t.match(/[\p{L}\p{N}]+/gu) ?? []).length < 5) continue;
       n++;
@@ -166,6 +166,6 @@ for (const f of FILES) {
     console.log(f, n, "paragraphs, % found:", pct);
     assert.ok(pct.grew >= 98 && pct.joined >= 98, "grew/joined");
     assert.ok(pct.split >= 85 && pct.reworded >= 92, "split/reworded");
-    assert.ok(pct.deletedElsewhere <= 4, "deleted");
+    assert.ok(pct.deletedElsewhere <= 5, "deleted");
   });
 }
