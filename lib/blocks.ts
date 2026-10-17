@@ -175,6 +175,13 @@ function words(s: string): Set<string> {
   return new Set(s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
 }
 
+const blockWords = new WeakMap<Block, Set<string>>();
+function wordsOf(b: Block): Set<string> {
+  let w = blockWords.get(b);
+  if (!w) blockWords.set(b, (w = words(b.text)));
+  return w;
+}
+
 function similarity(a: Set<string>, b: Set<string>): number {
   if (!a.size || !b.size) return 0;
   let common = 0;
@@ -182,12 +189,41 @@ function similarity(a: Set<string>, b: Set<string>): number {
   return common / (a.size + b.size - common);
 }
 
+// How rare each word is in the book (log((N+1)/(df+1))), so "a", "és", "hogy" barely count.
+// Computed once per parsed book.
+const rarityCache = new WeakMap<Block[], (w: string) => number>();
+function rarity(blocks: Block[]): (w: string) => number {
+  let r = rarityCache.get(blocks);
+  if (!r) {
+    const df = new Map<string, number>();
+    for (const b of blocks) for (const w of wordsOf(b)) df.set(w, (df.get(w) ?? 0) + 1);
+    r = (w) => Math.log((blocks.length + 1) / ((df.get(w) ?? 0) + 1));
+    rarityCache.set(blocks, r);
+  }
+  return r;
+}
+
+// Share of the old paragraph's words (weighted by rarity) still in b: high when a paragraph
+// grew or was joined with its neighbours, which similarity() scores low.
+function containment(a: Set<string>, b: Set<string>, rare: (w: string) => number): number {
+  let all = 0;
+  let kept = 0;
+  for (const w of a) {
+    const r = rare(w);
+    all += r;
+    if (b.has(w)) kept += r;
+  }
+  return all ? kept / all : 0;
+}
+
 function nearest(cands: Block[], index: number): Block {
   return cands.reduce((best, b) => (Math.abs(b.index - index) < Math.abs(best.index - index) ? b : best));
 }
 
 // Where a comment belongs now: its paragraph unchanged; else the paragraph holding its quoted
-// words; else the most similar paragraph near its old place (a later edit); else -1.
+// words; else the best match near its old place (a later edit: most words the same, or most
+// of the old words still there after it grew or was joined); else -1. The thresholds are
+// measured on the real books (test/blocks.test.mjs).
 export function locateAnchor(blocks: Block[], a: Anchor): number {
   if (blocks[a.blockIndex]?.text === a.blockText) return a.blockIndex;
   const same = blocks.filter((b) => b.text === a.blockText);
@@ -198,12 +234,16 @@ export function locateAnchor(blocks: Block[], a: Anchor): number {
     if (hits.length) return nearest(hits, a.blockIndex).index;
   }
   const target = words(a.blockText);
+  const rare = rarity(blocks);
   let best = -1;
-  let bestScore = 0.5;
+  let bestScore = 0;
   const from = Math.max(0, a.blockIndex - 60);
   const to = Math.min(blocks.length - 1, a.blockIndex + 60);
   for (let i = from; i <= to; i++) {
-    const s = similarity(target, words(blocks[i].text));
+    const b = wordsOf(blocks[i]);
+    const j = similarity(target, b);
+    const c = containment(target, b, rare);
+    const s = Math.max(j > 0.5 ? j : 0, c >= 0.8 ? c : 0);
     if (s > bestScore) {
       bestScore = s;
       best = i;

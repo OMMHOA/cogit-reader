@@ -99,6 +99,8 @@ node ../cogit-reader/scripts/review.mjs answer <id> "…"  # "-" reads the answe
 node ../cogit-reader/scripts/review.mjs edits            # unreviewed edits as word diffs
 node ../cogit-reader/scripts/review.mjs keep <id>…
 node ../cogit-reader/scripts/review.mjs revert <id> "…"  # after reverting it in git and pushing
+node ../cogit-reader/scripts/review.mjs anchors          # threads/edit marks whose paragraph changed or is lost
+node ../cogit-reader/scripts/review.mjs reanchor <id> <n> # put a lost thread on paragraph n
 ```
 
 ## Tests

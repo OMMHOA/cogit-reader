@@ -72,6 +72,18 @@ test("anchors survive edits and moves", () => {
   assert.equal(locateAnchor(blocks, { blockIndex: 1, blockText: "egészen más", quote: null }), -1);
 });
 
+test("anchors survive a paragraph that grew or was joined with its neighbours", () => {
+  const old = "„Menjetek előre, és legyetek jókedvűek! Allah megígérte nekem a két csapat egyikét.”¹²";
+  const grown = parseBlocks(
+    `Előtte.\n\n${old} [A két csapat: Abu Szufján karavánja és a kurejsita sereg, egyikük a muszlimok kezére kerül. – a ford.]\n\nUtána.\n`,
+  );
+  assert.equal(locateAnchor(grown, { blockIndex: 1, blockText: old, quote: null }), 1);
+  const joined = parseBlocks(`Előtte.\n\nMegkérdezte tőlük: „Mire vártok?” ${old} Azután harcolt, míg el nem esett.\n\nUtána.\n`);
+  assert.equal(locateAnchor(joined, { blockIndex: 2, blockText: old, quote: null }), 1);
+  const gone = parseBlocks("Előtte.\n\nUtána egy egészen más bekezdés jön.\n");
+  assert.equal(locateAnchor(gone, { blockIndex: 1, blockText: old, quote: null }), -1);
+});
+
 test("a chapter is found again by its title after chapters move", () => {
   const s = parseSections(parseBlocks("# A\n\nx\n\n# B\n\ny\n\n# C\n\nz\n"));
   assert.equal(locateSection(s, 1, "B"), 1);
@@ -120,5 +132,40 @@ for (const f of FILES) {
       assert.equal(r.text, src.slice(0, b.end) + " X" + src.slice(b.end));
     }
     console.log(f, blocks.length, "blocks;", sections.map((s) => s.title).join(" | "));
+  });
+
+  // Every 9th paragraph changed the ways the books get changed (on the site or in git): its
+  // thread must stay with it, and a deleted paragraph's thread must rarely land elsewhere.
+  test(`real book: anchors follow changed paragraphs: ${f}`, () => {
+    const blocks = parseBlocks(readFileSync(new URL(f, BOOKS), "utf8"));
+    const found = { grew: 0, joined: 0, split: 0, reworded: 0, deletedElsewhere: 0 };
+    let n = 0;
+    for (let i = 1; i < blocks.length - 1; i += 9) {
+      const t = blocks[i].text;
+      if (t.startsWith("#") || (t.match(/[\p{L}\p{N}]+/gu) ?? []).length < 5) continue;
+      n++;
+      // Replace `count` blocks from `from` by `texts` in place, locate, put them back. In place
+      // keeps the word rarities computed for the whole book (one paragraph off: no matter).
+      const at = (from, count, ...texts) => {
+        const removed = blocks.splice(from, count, ...texts.map((x) => ({ index: from, start: 0, end: 0, text: x })));
+        const r = locateAnchor(blocks, { blockIndex: i, blockText: t, quote: null });
+        blocks.splice(from, texts.length, ...removed);
+        return r;
+      };
+      const [prev, next] = [blocks[i - 1].text, blocks[i + 1].text];
+      const ws = t.split(" ");
+      const half = Math.ceil(ws.length / 2);
+      if (at(i, 1, `${t} ${next}`) === i) found.grew++;
+      if (at(i - 1, 3, `${prev} ${t} ${next}`) === i - 1) found.joined++;
+      const s = at(i, 1, ws.slice(0, half).join(" "), ws.slice(half).join(" "));
+      if (s === i || s === i + 1) found.split++;
+      if (at(i, 1, ws.map((w, k) => (k % 4 === 1 ? `xq${k}` : w)).join(" ")) === i) found.reworded++;
+      if (at(i, 1) !== -1) found.deletedElsewhere++;
+    }
+    const pct = Object.fromEntries(Object.entries(found).map(([k, v]) => [k, Math.round((1000 * v) / n) / 10]));
+    console.log(f, n, "paragraphs, % found:", pct);
+    assert.ok(pct.grew >= 98 && pct.joined >= 98, "grew/joined");
+    assert.ok(pct.split >= 85 && pct.reworded >= 92, "split/reworded");
+    assert.ok(pct.deletedElsewhere <= 4, "deleted");
   });
 }

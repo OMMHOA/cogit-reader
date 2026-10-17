@@ -9,10 +9,16 @@
 //   node scripts/review.mjs revert <edit-id> <text>    mark an edit as reverted (after reverting it in
 //                                                      git and pushing) and explain why, under the
 //                                                      paragraph and in the list of edits
+//   node scripts/review.mjs anchors                    threads and edit marks whose paragraph
+//                                                      changed or is lost (run from an up-to-date
+//                                                      checkout after joining or splitting
+//                                                      paragraphs in git; fix a lost one with
+//                                                      reanchor)
+//   node scripts/review.mjs reanchor <thread-id> <n>   put a thread on paragraph n as it is now
 // Ids may be shortened to their first 8 characters.
 import { readFileSync } from "node:fs";
 import { adminClient, die } from "./env.mjs";
-import { wordDiff } from "../lib/blocks.ts";
+import { locateAnchor, parseBlocks, wordDiff } from "../lib/blocks.ts";
 
 const sb = adminClient();
 const [cmd, ...args] = process.argv.slice(2);
@@ -105,6 +111,38 @@ if (cmd === "status") {
   });
   if (err2) die(err2.message);
   console.log(`Reverted ${id.slice(0, 8)} and left the note under the paragraph.`);
+} else if (cmd === "anchors") {
+  // The books as checked out here (run from the books repo); the site reads master.
+  const books = new Map();
+  const book = (path) => {
+    if (!books.has(path)) books.set(path, parseBlocks(readFileSync(path, "utf8")));
+    return books.get(path);
+  };
+  const threads = await rows("comments", "id, path, block_index, block_text, quote, status", (q) => q.is("parent_id", null));
+  const edits = await rows("edits", "id, path, block_index, new_text, status");
+  let shown = 0;
+  const report = (kind, r, text, quote) => {
+    const blocks = book(r.path);
+    const at = locateAnchor(blocks, { blockIndex: r.block_index, blockText: text, quote });
+    if (at !== -1 && blocks[at].text === text) return;
+    shown++;
+    const where = at === -1 ? "LOST, shown under its chapter without a paragraph" : `on ${at}, text changed since`;
+    console.log(`${kind} ${r.id.slice(0, 8)}  [${r.status}]  ${r.path}  block ${r.block_index}: ${where}`);
+    if (at === -1) console.log(indent(text));
+  };
+  for (const t of threads) if (t.block_index !== null) report("thread", t, t.block_text, t.quote);
+  for (const e of edits) report("edit  ", e, e.new_text, null);
+  if (!shown) console.log("Every thread and edit mark is on its paragraph, unchanged.");
+} else if (cmd === "reanchor") {
+  const id = await resolveId("comments", args[0]);
+  const index = Number(args[1]);
+  const { data: root } = await sb.from("comments").select("path, parent_id").eq("id", id).single();
+  if (root.parent_id) die("That is a reply; give the thread's first comment.");
+  const block = parseBlocks(readFileSync(root.path, "utf8"))[index];
+  if (!Number.isInteger(index) || !block) die(`No paragraph ${args[1]} in ${root.path}.`);
+  const { error } = await sb.from("comments").update({ block_index: index, block_text: block.text }).eq("id", id);
+  if (error) die(error.message);
+  console.log(`Thread ${id.slice(0, 8)} is on paragraph ${index}:\n${indent(block.text)}`);
 } else {
-  die("Commands: status, questions, answer, edits, keep, revert (see the top of this file).");
+  die("Commands: status, questions, answer, edits, keep, revert, anchors, reanchor (see the top of this file).");
 }

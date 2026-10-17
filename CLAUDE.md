@@ -53,6 +53,10 @@ third and fourth migrations applied on the hosted project.
 - The database schema is the migrations in `supabase/migrations/`; on the hosted project each is
   applied by pasting it into the SQL editor, on a running local one by
   `npx supabase migration up`.
+- Threads, notes and edit marks find their paragraph again by text (`locateAnchor` in
+  `lib/blocks.ts`), tuned on the real books in `test/blocks.test.mjs`. After joining or splitting
+  paragraphs in the books repo, run `review.mjs anchors` and `reanchor` any lost thread (notes
+  can't be checked: they're private).
 - The English/Arabic matching (`lib/align.ts`) is tuned on the real books: `test/align.test.mjs`
   checks it against footnote numbers (English), marker counts and Qur'ān verse numbers
   (Arabic), and sections only the translation has. Measure any change on both books.
