@@ -13,6 +13,7 @@ import { join } from "node:path";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../scripts/env.mjs";
+import { parseBlocks } from "../lib/blocks.ts";
 
 const BASE = process.env.BASE_URL || "http://127.0.0.1:3100";
 const BARE = process.env.BARE_REPO;
@@ -21,6 +22,9 @@ const MH = "muslim-home/MuslimHome-Muhammad-Salih-al-Munajjid-HUN.md";
 const git = (...args) => execFileSync("git", ["--git-dir", BARE, ...args], { encoding: "utf8", maxBuffer: 1 << 28 }).trim();
 const review = (...args) =>
   execFileSync("node", [new URL("../scripts/review.mjs", import.meta.url).pathname, ...args], { encoding: "utf8" });
+// review.mjs from a checkout of the fake GitHub's repo (the commands that read the books there).
+const reviewIn = (dir, ...args) =>
+  execFileSync("node", [new URL("../scripts/review.mjs", import.meta.url).pathname, ...args], { encoding: "utf8", cwd: dir });
 
 // A commit made "elsewhere" (like a push from the books repo), via a throwaway clone. A file
 // that isn't there yet starts empty.
@@ -396,6 +400,62 @@ try {
   await shot(page, "16-rules");
   ok("the rules page shows the rules file of the latest master, and the edit box links to it");
 
+  // Errors in the Arabic original: Claude adds them, a member decides on the site, Claude marks them done.
+  const co = mkdtempSync(join(tmpdir(), "e2e-"));
+  execFileSync("git", ["clone", "-q", BARE, co]);
+  const mhSrc = readFileSync(join(co, MH), "utf8");
+  const snippets = parseBlocks(mhSrc)
+    .filter((b) => b.text.length > 200 && !/[*_\[\]#>]/.test(b.text))
+    .map((b) => ({ index: b.index, text: b.text.slice(60, 100) }))
+    .filter((x) => mhSrc.split(x.text).length === 2)
+    .slice(0, 2);
+  const errs = snippets.map((x, i) => ({
+    path: MH,
+    arabic: i ? "أبو عبادة" : "عمر بن عنبسة",
+    hu_now: x.text,
+    hu_fix: x.text.replace(/\S+$/, "JAVÍTVA"),
+    reason: i ? "Ténybeli tévedés, a források mást mondanak." : "Egy betű különbség, elírás.",
+    claude_view: i ? "fact" : "slip",
+  }));
+  writeFileSync(join(co, "errs.json"), JSON.stringify(errs));
+  assert.match(reviewIn(co, "errors", "add", "errs.json"), new RegExp(`Added \\(block ${snippets[0].index}\\)`));
+  assert.equal(reviewIn(co, "errors", "add", "errs.json").match(/Already there/g).length, 2);
+  rmSync(co, { recursive: true });
+  await page.locator(".top nav a", { hasText: "Az eredeti hibái" }).click();
+  await waitPath(page, "/hibak");
+  await page.locator(".ar-error").first().waitFor();
+  assert.equal(await page.locator(".tabs a.on").textContent(), "Döntésre vár (2)");
+  assert.deepEqual(await page.locator(".ar-error .ar").allTextContents(), ["عمر بن عنبسة", "أبو عبادة"]);
+  assert.equal(await page.locator(".ar-error .ar").first().getAttribute("dir"), "rtl");
+  assert.deepEqual(await page.locator("section > h2").allTextContents(), [
+    "Claude szerint elírás",
+    "Claude szerint nem elírás, hanem ténybeli tévedés",
+  ]);
+  assert.match(await page.locator(".ar-error .where a").first().getAttribute("href"), new RegExp(`^/k/muslim-home/\\d+#p-${snippets[0].index}$`));
+  await shot(page, "17-arabic-errors");
+  const card = page.locator(".ar-error").first();
+  await card.locator("textarea").fill("Egyetértek.");
+  await card.getByRole("button", { name: "Elírás: javítsuk jegyzet nélkül" }).click();
+  await page.locator(".tabs a.on", { hasText: "Döntésre vár (1)" }).waitFor();
+  assert.equal(await page.locator(".ar-error").count(), 1);
+  await page.goto(`${BASE}/hibak?lap=eldontve`);
+  const decided = page.locator(".ar-error");
+  assert.equal(await decided.count(), 1);
+  assert.equal(await decided.getByRole("button", { name: "Elírás: javítsuk jegyzet nélkül" }).getAttribute("aria-pressed"), "true");
+  assert.equal(await decided.locator("textarea").inputValue(), "Egyetértek.");
+  assert.match(await decided.locator(".hint").textContent(), /^Teszt Elek döntött/);
+  const listedErrs = review("errors");
+  assert.match(listedErrs, /\[slip, by Teszt Elek .*\][\s\S]*Comment:\n    Egyetértek\./);
+  assert.match(listedErrs, /\[undecided\]/);
+  const errId = /=== (\w{8})  \[slip/.exec(listedErrs)[1];
+  review("errors", "done", errId);
+  assert.ok(!review("errors").includes(errId));
+  assert.match(review("status"), /Arabic errors: +0 decided, waiting to be carried out \(undecided 1, done 1\)/);
+  await page.goto(`${BASE}/hibak?lap=atvezetve`);
+  assert.match(await page.locator(".ar-error .decided").textContent(), /^Elírás: javítsuk jegyzet nélkül · Egyetértek\. · átvezetve a könyvbe$/);
+  assert.equal(await page.locator(".ar-error button").count(), 0);
+  ok("errors in the Arabic: added by Claude, decided with a comment on the site, listed and marked done by review.mjs");
+
   // Phone width and dark mode.
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -422,6 +482,11 @@ try {
   const overflowNote = await pp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflowNote <= 0, `horizontal overflow with the note open ${overflowNote}px`);
   await shot(pp, "15-phone-note");
+  await pp.goto(`${BASE}/hibak?lap=mind`);
+  await pp.locator(".ar-error").first().waitFor();
+  const overflowErr = await pp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  assert.ok(overflowErr <= 0, `horizontal overflow on the errors page ${overflowErr}px`);
+  await shot(pp, "18-phone-errors");
   ok("no horizontal scrolling at phone width, also with the Arabic under the paragraphs");
 
   // Not a member: no access.
@@ -467,7 +532,26 @@ try {
   assert.ok(forged, "nobody writes a note as someone else");
   const { data: mineNow } = await me.c.from("notes").select("body");
   assert.deepEqual(mineNow.map((n) => n.body), [NOTE]);
-  ok("RLS: outsiders see nothing, members can't post as Claude or rewrite comments, notes are private, sign-ups are off");
+  // Errors in the Arabic: members only decide, and not once they are done.
+  for (const c of [anon, outsider]) {
+    const { data } = await c.from("arabic_errors").select("id");
+    assert.equal(data?.length ?? 0, 0, "outsiders must not read the errors");
+  }
+  const { data: errRows } = await member.from("arabic_errors").select("id, applied_at").order("applied_at");
+  const [doneErr, openErr] = [errRows.find((r) => r.applied_at), errRows.find((r) => !r.applied_at)];
+  const { error: errIns } = await member
+    .from("arabic_errors")
+    .insert({ path: MH, block_index: 0, block_text: "x", arabic: "x", hu_now: "x", hu_fix: "x", reason: "x", claude_view: "slip" });
+  assert.ok(errIns, "members must not add errors");
+  const { error: errFix } = await member.from("arabic_errors").update({ hu_fix: "átírva" }).eq("id", openErr.id);
+  assert.ok(errFix, "members must not rewrite an error");
+  const { error: errName } = await member.from("arabic_errors").update({ decision: "fact", decided_name: "Valaki" }).eq("id", openErr.id);
+  assert.ok(errName, "the decider's name comes from the account");
+  const { data: errLate } = await member.from("arabic_errors").update({ decision: "fact" }).eq("id", doneErr.id).select("id");
+  assert.equal(errLate.length, 0, "a done error can't be decided again");
+  const { data: errKata } = await kata.c.from("arabic_errors").update({ decision: "fact" }).eq("id", openErr.id).select("decided_name");
+  assert.deepEqual(errKata, [{ decided_name: "Kolléga Kata" }]);
+  ok("RLS: outsiders see nothing, members can't post as Claude or rewrite comments, notes are private, sign-ups are off; members only decide errors");
 
   console.log(`\nall ${step} passed`);
 } finally {

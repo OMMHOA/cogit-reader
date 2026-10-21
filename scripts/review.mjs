@@ -15,6 +15,15 @@
 //                                                      paragraphs in git; fix a lost one with
 //                                                      reanchor)
 //   node scripts/review.mjs reanchor <thread-id> <n>   put a thread on paragraph n as it is now
+//   node scripts/review.mjs errors [--all]             errors in the Arabic original not carried into
+//                                                      the books yet, with the decisions (all: also
+//                                                      the ones done)
+//   node scripts/review.mjs errors add <file.json>     add errors for a decision on the site: a list of
+//                                                      { path, arabic, hu_now, hu_fix, reason,
+//                                                      claude_view: "slip" | "fact" }, hu_now found
+//                                                      in the paragraph it is in (run from the books
+//                                                      repo; one already there is skipped)
+//   node scripts/review.mjs errors done <id>...        mark errors as carried into the books
 // Ids may be shortened to their first 8 characters.
 import { readFileSync } from "node:fs";
 import { adminClient, die } from "./env.mjs";
@@ -46,6 +55,9 @@ if (cmd === "status") {
   const n = (list, s) => list.filter((r) => r.status === s).length;
   console.log(`Questions waiting: ${n(threads, "open")} (answered ${n(threads, "answered")}, closed ${n(threads, "resolved")})`);
   console.log(`Edits to review:   ${n(edits, "pending")} (kept ${n(edits, "kept")}, reverted ${n(edits, "reverted")})`);
+  const errs = await rows("arabic_errors", "decision, applied_at");
+  const open = errs.filter((r) => !r.applied_at);
+  console.log(`Arabic errors:     ${open.filter((r) => r.decision).length} decided, waiting to be carried out (undecided ${open.filter((r) => !r.decision).length}, done ${errs.length - open.length})`);
 } else if (cmd === "questions") {
   const all = await rows("comments", "*");
   const roots = all.filter((r) => !r.parent_id && (args.includes("--all") || r.status === "open"));
@@ -143,6 +155,51 @@ if (cmd === "status") {
   const { error } = await sb.from("comments").update({ block_index: index, block_text: block.text }).eq("id", id);
   if (error) die(error.message);
   console.log(`Thread ${id.slice(0, 8)} is on paragraph ${index}:\n${indent(block.text)}`);
+} else if (cmd === "errors" && args[0] === "add") {
+  const items = JSON.parse(readFileSync(args[1] ?? die("Missing file."), "utf8"));
+  const have = await rows("arabic_errors", "path, hu_now");
+  for (const it of items) {
+    if (!["path", "arabic", "hu_now", "hu_fix", "reason"].every((k) => typeof it[k] === "string" && it[k]))
+      die(`Missing a field in ${JSON.stringify(it).slice(0, 100)}`);
+    if (!["slip", "fact"].includes(it.claude_view)) die(`claude_view must be slip or fact: ${it.hu_now}`);
+    if (have.some((h) => h.path === it.path && h.hu_now === it.hu_now)) {
+      console.log(`Already there: ${it.hu_now.slice(0, 60)}`);
+      continue;
+    }
+    const hits = parseBlocks(readFileSync(it.path, "utf8")).filter((b) => b.text.includes(it.hu_now));
+    if (hits.length !== 1) die(`${hits.length} paragraphs contain: ${it.hu_now}`);
+    const { error } = await sb.from("arabic_errors").insert({
+      path: it.path,
+      block_index: hits[0].index,
+      block_text: hits[0].text,
+      arabic: it.arabic,
+      hu_now: it.hu_now,
+      hu_fix: it.hu_fix,
+      reason: it.reason,
+      claude_view: it.claude_view,
+    });
+    if (error) die(error.message);
+    console.log(`Added (block ${hits[0].index}): ${it.hu_now.slice(0, 60)}`);
+  }
+} else if (cmd === "errors" && args[0] === "done") {
+  if (args.length < 2) die("Missing ids.");
+  for (const short of args.slice(1)) {
+    const id = await resolveId("arabic_errors", short);
+    const { error } = await sb.from("arabic_errors").update({ applied_at: new Date().toISOString() }).eq("id", id);
+    if (error) die(error.message);
+    console.log(`Done ${id.slice(0, 8)}.`);
+  }
+} else if (cmd === "errors") {
+  const all = await rows("arabic_errors", "*", (q) => (args.includes("--all") ? q : q.is("applied_at", null)));
+  if (!all.length) console.log("No errors waiting.");
+  const view = { slip: "slip", fact: "fact (keep the note)" };
+  for (const e of all.sort((a, b) => a.path.localeCompare(b.path) || a.block_index - b.block_index)) {
+    const verdict = e.decision ? `${view[e.decision]}, by ${e.decided_name} ${e.decided_at.slice(0, 16)}` : "undecided";
+    console.log(`=== ${e.id.slice(0, 8)}  [${verdict}]${e.applied_at ? "  [done]" : ""}  ${e.path}  block ${e.block_index}`);
+    console.log(`Arabic: ${e.arabic}\nNow:    ${e.hu_now}\nFix:    ${e.hu_fix}\nClaude: ${view[e.claude_view]}. ${e.reason}`);
+    if (e.comment) console.log(`Comment:\n${indent(e.comment)}`);
+    console.log();
+  }
 } else {
-  die("Commands: status, questions, answer, edits, keep, revert, anchors, reanchor (see the top of this file).");
+  die("Commands: status, questions, answer, edits, keep, revert, anchors, reanchor, errors (see the top of this file).");
 }

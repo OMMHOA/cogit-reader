@@ -129,6 +129,24 @@ export async function setStatus(input: { threadId: unknown; status: unknown }): 
   return error ? { error: error.message } : {};
 }
 
+// A member's verdict on an error in the Arabic original (null takes it back), with a comment.
+export async function decideError(input: { id: unknown; decision: unknown; comment: unknown }): Promise<Result> {
+  const m = await member();
+  if (!m) return { error: AGAIN };
+  const id = str(input.id, 100);
+  const decision = input.decision === "slip" || input.decision === "fact" ? input.decision : null;
+  const comment = str(input.comment, 5000);
+  if (!id || (input.decision !== null && !decision) || comment === null) return { error: "Hibás kérés." };
+  const sb = await supabase();
+  const { data, error } = await sb
+    .from("arabic_errors")
+    .update({ decision, comment: comment.trim() || null })
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: "Nem sikerült menteni: " + error.message };
+  return data.length ? {} : { error: "Ezt Claude már átvezette a könyvbe, nem változtatható." };
+}
+
 // The member's own note on a chapter, or on a paragraph of it when `blockIndex` and `blockText`
 // (the paragraph as it is now, which the note is anchored to from then on) are given
 // (lib/notes.ts). `ids` are the rows shown as the note; an empty text deletes it. Returns the

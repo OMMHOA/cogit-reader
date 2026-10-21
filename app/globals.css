@@ -739,6 +739,53 @@ ins {
   background: var(--ins);
   text-decoration: none;
 }
+/* Errors in the Arabic original, to decide */
+.ar-error {
+  padding: 12px 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+.ar-error dl {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 8px 0 12px;
+}
+.ar-error dt {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding-top: 2px;
+}
+.ar-error dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ar-error .ar {
+  font-family: var(--font-arabic), serif;
+  font-size: 1.3rem;
+  line-height: 1.6;
+  text-align: right;
+}
+.ar-error .book {
+  font-family: var(--book);
+  font-size: 1.05rem;
+}
+.decide textarea {
+  margin-top: 8px;
+  resize: vertical;
+}
+.decided {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .ar-error dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .ar-error dd + dt {
+    margin-top: 8px;
+  }
+}
+
 .note {
   background: var(--claude);
   border-left: 3px solid var(--claude-line);

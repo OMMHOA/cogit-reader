@@ -27,6 +27,11 @@ questions about the translation that Claude answers. The UI is in Hungarian.
 - **Rules:** *Szabályok* shows `FORDITASI-ELVEK.md` from the root of the books repo (latest
   `master`): the translation conventions in Hungarian, for the proofreaders, with a dated list of
   the changes. The edit box and the home page link to it.
+- **Errors in the Arabic original:** *Az eredeti hibái* lists the places where the Arabic itself
+  errs, each with the Arabic, the Hungarian as it is, what it would become, Claude's reasoning and
+  view. A member decides: a slip of the pen (a name off by a letter, a wrong digit) is corrected
+  without a note, a factual error stays with a translator's note. Claude adds the cases and
+  carries the decisions into the books (`review.mjs errors`).
 - **Personal notes:** on a chapter (the *Jegyzet* button in the corner; shown at the top of the
   chapter) and on any paragraph (*Saját jegyzet* in its menu; shown under it, and following it
   through edits the way questions do; if the paragraph is rewritten beyond recognition the note
@@ -44,7 +49,8 @@ questions about the translation that Claude answers. The UI is in Hungarian.
    *Central EU (Frankfurt)*. Then:
    - SQL Editor → paste `supabase/migrations/20261011000000_init.sql` → Run, then the same with
      `supabase/migrations/20261014000000_notes.sql` and
-     `supabase/migrations/20261014010000_paragraph_notes.sql` (personal notes).
+     `supabase/migrations/20261014010000_paragraph_notes.sql` (personal notes), and
+     `supabase/migrations/20261021000000_arabic_errors.sql` (errors in the Arabic original).
    - Authentication → Sign In / Providers → turn off **Allow new users to sign up**.
    - Project Settings → API Keys: note the project URL, the **publishable** key and the
      **secret** key.
@@ -101,6 +107,9 @@ node ../cogit-reader/scripts/review.mjs keep <id>…
 node ../cogit-reader/scripts/review.mjs revert <id> "…"  # after reverting it in git and pushing
 node ../cogit-reader/scripts/review.mjs anchors          # threads/edit marks whose paragraph changed or is lost
 node ../cogit-reader/scripts/review.mjs reanchor <id> <n> # put a lost thread on paragraph n
+node ../cogit-reader/scripts/review.mjs errors add <file.json>  # errors in the Arabic, for a decision
+node ../cogit-reader/scripts/review.mjs errors           # them with the decisions made on the site
+node ../cogit-reader/scripts/review.mjs errors done <id>…  # after carrying them into the books
 ```
 
 ## Tests

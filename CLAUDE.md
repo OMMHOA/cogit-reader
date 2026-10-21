@@ -14,6 +14,8 @@ Automatic answers (`.github/workflows/answer-questions.yml` + the second migrati
 2026-10-13: a reply on the site started the workflow and Claude answered in about 1.5 minutes.
 Edit marks and personal notes (per chapter and per paragraph) live since 2026-10-14, with the
 third and fourth migrations applied on the hosted project.
+The *Az eredeti hibái* page (`/hibak`, fifth migration) built 2026-10-21, for the user to decide
+which errors in the Arabic are slips.
 
 ## Decisions (agreed with the user)
 
@@ -32,6 +34,10 @@ third and fourth migrations applied on the hosted project.
 - Personal notes (`notes` table) are private to their author: RLS allows only them, and nothing
   else may read the table — not `review.mjs`, not the workflow, not Claude in a review. Keep it
   that way; the UI promises it ("sem a többi lektor, sem Claude nem olvassa").
+- Errors in the Arabic original (user decision 2026-10-21): a clear slip of the author (a name
+  off by a letter, a wrong digit) is corrected in the translation without a note; a factual error
+  keeps the faithful text and a translator's note. **The user decides each case**, on `/hibak`:
+  Claude adds candidates with `review.mjs errors add` and changes the books only after a decision.
 - The UI is Hungarian, informal (*te*). Error messages in `lib/blocks.ts` too.
 - An edit may only change words: same number of lines, same Markdown prefix per line, same
   footnote markers (¹ ²…), no blank lines (`checkEdit` in `lib/blocks.ts`). Everything outside
