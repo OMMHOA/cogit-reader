@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { headSha, treeOf, blobText } from "./github";
 import { parseBlocks, parseSections, headingText, type Block, type Section } from "./blocks";
 
@@ -42,7 +43,8 @@ async function load(slug: string, path: string, blobSha: string): Promise<Omit<B
   return book;
 }
 
-export async function listBooks(): Promise<Book[]> {
+// Once per request: a page and its title (generateMetadata) read the same branch head.
+export const listBooks = cache(async (): Promise<Book[]> => {
   const tree = await treeOf(await headSha());
   const versions = new Map<string, Book["versions"]>();
   for (const e of tree) {
@@ -57,8 +59,11 @@ export async function listBooks(): Promise<Book[]> {
     return m ? [{ slug: m[1], path: e.path, sha: e.sha }] : [];
   });
   return Promise.all(refs.map(async (r) => ({ ...(await load(r.slug, r.path, r.sha)), versions: versions.get(r.slug) ?? {} })));
-}
+});
 
 export async function getBook(slug: string): Promise<Book | null> {
   return (await listBooks()).find((b) => b.slug === slug) ?? null;
 }
+
+// A chapter as the contents name it: the title page by that, not by the book's title again.
+export const sectionName = (book: Book, s: Section) => (s.index === 0 && s.title === book.title ? "Címlap" : s.title);

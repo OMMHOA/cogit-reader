@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import LoginForm from "./LoginForm";
+
+export const metadata: Metadata = { title: "Belépés" };
 
 export default async function Login({ searchParams }: { searchParams: Promise<{ vissza?: string }> }) {
   if ((await currentUser()).member) redirect("/");

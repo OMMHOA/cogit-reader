@@ -717,7 +717,8 @@ blockquote.was {
   color: var(--accent-text);
 }
 .qa,
-.edit-item {
+.edit-item,
+.note-item {
   padding: 12px 0 8px;
   border-bottom: 1px solid var(--line);
 }
@@ -915,6 +916,17 @@ ins {
 .pnote textarea {
   margin-top: 6px;
   resize: vertical;
+}
+/* The list of them */
+.note-item .note-body {
+  max-height: none;
+  margin: 6px 0 4px;
+  padding: 6px 12px 8px;
+  font-size: 0.93rem;
+  line-height: 1.5;
+  background: var(--note);
+  border: 1px solid var(--note-line);
+  border-radius: 6px;
 }
 
 /* Forms */

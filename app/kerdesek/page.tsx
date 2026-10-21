@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireMember } from "@/lib/auth";
 import { listBooks } from "@/lib/books";
 import { loadThreads, type Status } from "@/lib/threads";
 import { sectionOf } from "@/lib/blocks";
 import ThreadView from "@/components/ThreadView";
+
+export const metadata: Metadata = { title: "Kérdések" };
 
 const TABS: { key: string; label: string; show: Status[] }[] = [
   { key: "nyitott", label: "Válaszra vár", show: ["open"] },
@@ -15,7 +18,7 @@ const TABS: { key: string; label: string; show: Status[] }[] = [
 export default async function Questions({ searchParams }: { searchParams: Promise<{ lap?: string }> }) {
   await requireMember();
   const { lap } = await searchParams;
-  const tab = TABS.find((t) => t.key === lap) ?? TABS[3];
+  const tab = TABS.find((t) => t.key === lap) ?? TABS[1];
   const books = await listBooks();
   const threads = (await loadThreads(books)).filter((t) => tab.show.includes(t.status)).reverse();
   return (

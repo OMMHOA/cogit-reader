@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { logout } from "../actions";
+
+export const metadata: Metadata = { title: "Nincs hozzáférésed" };
 
 export default function NoAccess() {
   return (

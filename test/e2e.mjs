@@ -158,7 +158,10 @@ try {
   await blk2.locator(".thread-collapsed").waitFor();
   ok("a reply reopens the thread; closing collapses it");
 
-  // The lists.
+  // The lists; the questions open on the answered ones.
+  await page.goto(`${BASE}/kerdesek`);
+  assert.equal(await page.locator(".tabs a.on").textContent(), "Megválaszolt");
+  assert.equal(await page.title(), "Kérdések · Lektorálás");
   await page.goto(`${BASE}/kerdesek?lap=lezart`);
   await page.locator(".qa", { hasText: "Miért ez a szó áll itt?" }).waitFor();
   await page.goto(`${BASE}/javitasok`);
@@ -282,6 +285,18 @@ try {
   await page.keyboard.press("Escape");
   const { data: pRows } = await me.c.from("notes").select("block_text, body").not("block_index", "is", null);
   assert.deepEqual(pRows, [{ block_text: nOld + " (jav.)", body: PNOTE + " Kész." }]);
+  // All of them on one page, in reading order, each a link to where it is.
+  await page.goto(`${BASE}/jegyzetek`);
+  assert.deepEqual(await page.locator(".note-item .note-body").allInnerTexts(), [NOTE, PNOTE + " Kész."]);
+  assert.equal(await page.locator(".note-item .where a").first().getAttribute("href"), "/k/muslim-home/2");
+  await shot(page, "07e-notes");
+  await page.locator(".note-item .where a").nth(1).click();
+  await waitPath(page, "/k/muslim-home/2");
+  assert.equal(new URL(page.url()).hash, `#${nId}`);
+  await page.waitForFunction((id) => {
+    const r = document.getElementById(id).getBoundingClientRect();
+    return r.top >= 0 && r.top < innerHeight;
+  }, nId);
   commitElsewhere(MH, (s) => s.replace(nOld + " (jav.)", "Egészen más bekezdés került ide, semmi köze az előzőhöz."), "Rewrite a paragraph");
   await page.reload();
   await page.locator(".orphans .pnote .note-body", { hasText: PNOTE }).waitFor();
@@ -295,7 +310,16 @@ try {
   await page.locator(".orphans .pnote .saved-mark").waitFor();
   await page.getByRole("button", { name: "Kész" }).click();
   assert.equal(await page.locator(".pnote").count(), 0);
-  ok("a note on a paragraph: under it, follows it through an edit, kept in the chapter when the paragraph is rewritten");
+  ok("a note on a paragraph: under it, follows it through an edit, kept in the chapter when the paragraph is rewritten; the list of notes links to them");
+
+  // Window titles name the page: the book, the chapter in it.
+  await page.goto(`${BASE}/k/muslim-home`);
+  const bookTitle = await page.locator("h1").textContent();
+  assert.equal(await page.title(), `${bookTitle} · Lektorálás`);
+  const chapterName = await page.locator(".toc li a").nth(2).textContent();
+  await page.goto(`${BASE}/k/muslim-home/2`);
+  assert.equal(await page.title(), `${chapterName} – ${bookTitle} · Lektorálás`);
+  ok("the window title names the book and the chapter");
 
   // A stale page: another paragraph changed meanwhile → saving still works and keeps that change;
   // the same paragraph changed meanwhile → refused.
@@ -314,6 +338,8 @@ try {
   await b.locator("textarea.edit").fill(bOld + " B");
   await b.getByRole("button", { name: "Mentés" }).click();
   await page.locator(".saved").waitFor();
+  // The page refreshes after the save: wait for it, or the next click races the renumbering.
+  await page.locator(".blk .md", { hasText: "Új bekezdés máshonnan." }).waitFor();
   const after = git("show", `master:${MH}`);
   assert.ok(after.includes("Új bekezdés máshonnan.") && after.includes(bOld + " B"));
   ok("an edit from a stale page lands on the moved paragraph and keeps the other change");

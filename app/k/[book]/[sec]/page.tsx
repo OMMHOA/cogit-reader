@@ -1,7 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireMember } from "@/lib/auth";
-import { getBook } from "@/lib/books";
+import { getBook, sectionName } from "@/lib/books";
 import { loadThreads } from "@/lib/threads";
 import { loadEdits } from "@/lib/edits";
 import { loadNotes } from "@/lib/notes";
@@ -10,12 +11,26 @@ import { sectionOf } from "@/lib/blocks";
 import ChapterView from "@/components/ChapterView";
 import { ChapterNote } from "@/components/Notes";
 
-export default async function SectionPage({ params }: { params: Promise<{ book: string; sec: string }> }) {
-  const me = await requireMember();
+type Params = Promise<{ book: string; sec: string }>;
+
+async function chapter(params: Params) {
   const { book: slug, sec } = await params;
   const book = await getBook(slug);
-  const s = book?.sections[Number(sec)];
-  if (!book || !s || !/^\d+$/.test(sec)) notFound();
+  const s = /^\d+$/.test(sec) ? book?.sections[Number(sec)] : undefined;
+  return book && s ? { book, s } : null;
+}
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const found = await chapter(params);
+  return found ? { title: `${sectionName(found.book, found.s)} – ${found.book.title}` } : {};
+}
+
+export default async function SectionPage({ params }: { params: Params }) {
+  const me = await requireMember();
+  const found = await chapter(params);
+  if (!found) notFound();
+  const { book, s } = found;
+  const slug = book.slug;
   const [threads, edits, notes] = await Promise.all([
     loadThreads([book], book.path),
     loadEdits(book, me.id),

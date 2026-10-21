@@ -1,10 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireMember } from "@/lib/auth";
-import { getBook } from "@/lib/books";
+import { getBook, sectionName } from "@/lib/books";
 import { loadThreads } from "@/lib/threads";
 import { loadNotes } from "@/lib/notes";
 import { sectionOf } from "@/lib/blocks";
+
+export async function generateMetadata({ params }: { params: Promise<{ book: string }> }): Promise<Metadata> {
+  const book = await getBook((await params).book);
+  return book ? { title: book.title } : {};
+}
 
 export default async function BookPage({ params }: { params: Promise<{ book: string }> }) {
   const me = await requireMember();
@@ -30,7 +36,7 @@ export default async function BookPage({ params }: { params: Promise<{ book: str
       <ol className="toc">
         {book.sections.map((s) => (
           <li key={s.index}>
-            <Link href={`/k/${slug}/${s.index}`}>{s.index === 0 && s.title === book.title ? "Címlap" : s.title}</Link>
+            <Link href={`/k/${slug}/${s.index}`}>{sectionName(book, s)}</Link>
             {open.get(s.index) ? <span className="count">{open.get(s.index)} beszélgetés</span> : null}
             {noted.get(s.index) ? <span className="count note">{noted.get(s.index)} jegyzet</span> : null}
           </li>

@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { requireMember } from "@/lib/auth";
 import { headSha, treeOf, blobText } from "@/lib/github";
 import { renderText } from "@/lib/render";
+
+export const metadata: Metadata = { title: "Szabályok" };
 
 // The translation rules for proofreaders: a Hungarian summary of the conventions, kept in the
 // books repo next to the books and read from the latest master like them.

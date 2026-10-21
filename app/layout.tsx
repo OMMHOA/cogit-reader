@@ -9,7 +9,7 @@ const lora = Lora({ subsets: ["latin", "latin-ext"], style: ["normal", "italic"]
 const amiri = Amiri({ subsets: ["arabic"], weight: ["400", "700"], variable: "--font-arabic" });
 
 export const metadata: Metadata = {
-  title: "Lektorálás",
+  title: { template: "%s · Lektorálás", default: "Lektorálás" },
   description: "Az iszlám könyvek magyar fordításainak közös javítása",
   robots: { index: false, follow: false },
 };
@@ -27,6 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <nav>
               <Link href="/">Könyvek</Link>
               <Link href="/kerdesek">Kérdések</Link>
+              <Link href="/jegyzetek">Jegyzeteim</Link>
               <Link href="/javitasok">Javítások</Link>
               <Link href="/hibak">Az eredeti hibái</Link>
               <Link href="/szabalyok">Szabályok</Link>

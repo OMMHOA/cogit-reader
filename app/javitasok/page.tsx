@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireMember } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
@@ -6,6 +7,8 @@ import { formatDate } from "@/lib/threads";
 import { locateAnchor, sectionOf } from "@/lib/blocks";
 import type { EditStatus } from "@/lib/edits";
 import { Diff, EditChip } from "@/components/EditDiff";
+
+export const metadata: Metadata = { title: "Javítások" };
 
 type Edit = {
   id: string;

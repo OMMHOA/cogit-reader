@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireMember } from "@/lib/auth";
 import { listBooks } from "@/lib/books";
 import { loadArabicErrors, type ArabicError, type View } from "@/lib/arabicErrors";
 import { sectionOf } from "@/lib/blocks";
 import ErrorDecision from "@/components/ErrorDecision";
+
+export const metadata: Metadata = { title: "Az eredeti hibái" };
 
 const TABS: { key: string; label: string; show: (e: ArabicError) => boolean }[] = [
   { key: "dontesre-var", label: "Döntésre vár", show: (e) => !e.decision && !e.applied },

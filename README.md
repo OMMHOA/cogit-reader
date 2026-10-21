@@ -23,7 +23,7 @@ questions about the translation that Claude answers. The UI is in Hungarian.
 - **Questions:** select words (optional), write a question; threads are stored in Supabase
   (private, unlike the public books repo). Claude answers within a few minutes (a GitHub
   workflow, setup step 6). A reply from Claude marks the thread answered; a reply from a person
-  reopens it, and Claude answers that too.
+  reopens it, and Claude answers that too. *Kérdések* lists them, opening on the answered ones.
 - **Rules:** *Szabályok* shows `FORDITASI-ELVEK.md` from the root of the books repo (latest
   `master`): the translation conventions in Hungarian, for the proofreaders, with a dated list of
   the changes. The edit box and the home page link to it.
@@ -35,8 +35,8 @@ questions about the translation that Claude answers. The UI is in Hungarian.
 - **Personal notes:** on a chapter (the *Jegyzet* button in the corner; shown at the top of the
   chapter) and on any paragraph (*Saját jegyzet* in its menu; shown under it, and following it
   through edits the way questions do; if the paragraph is rewritten beyond recognition the note
-  stays in the chapter with the old text). They save themselves, and the contents count them per
-  chapter. Only their author can read them (row-level security), and no script reads the table,
+  stays in the chapter with the old text). They save themselves, the contents count them per
+  chapter, and *Jegyzeteim* lists them all in reading order, each a link to its place. Only their author can read them (row-level security), and no script reads the table,
   so Claude never sees them and they start no workflow.
 - **Access:** email + password, invite-only: only accounts with `app_metadata.member` (set by
   `scripts/admin.mjs`) get in, enforced in the app and by row-level security.

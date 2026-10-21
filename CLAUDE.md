@@ -16,6 +16,8 @@ Edit marks and personal notes (per chapter and per paragraph) live since 2026-10
 third and fourth migrations applied on the hosted project.
 The *Az eredeti hibái* page (`/hibak`, fifth migration) built 2026-10-21, for the user to decide
 which errors in the Arabic are slips.
+The *Jegyzeteim* page (`/jegyzetek`, all of one's notes, linking to each) and window titles naming
+the page (the chapter and book on a chapter page) built 2026-10-22; no migration.
 
 ## Decisions (agreed with the user)
 
